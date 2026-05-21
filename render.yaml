@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: onepagecrm-mcp-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: MCP_TRANSPORT
+        value: http
+      - key: ONEPAGECRM_ENDPOINT
+        sync: false
+      - key: ONEPAGECRM_USER_ID
+        sync: false
+      - key: ONEPAGECRM_API_KEY
+        sync: false
