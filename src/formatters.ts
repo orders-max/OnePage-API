@@ -128,7 +128,7 @@ export function describeDeal(response: unknown): string {
 }
 
 export function describeUsers(response: unknown): string {
-  const users = arrayFromWrapped(getData(response), "user");
+  const users = arrayFromWrapped(getDataValue(response), "user");
   if (users.length === 0) {
     return "No users were found.";
   }
@@ -170,7 +170,7 @@ export function structuredDeal(response: unknown): Record<string, unknown> {
 }
 
 export function structuredUsers(response: unknown): Record<string, unknown> {
-  return { users: arrayFromWrapped(getData(response), "user").map(userSummary) };
+  return { users: arrayFromWrapped(getDataValue(response), "user").map(userSummary) };
 }
 
 export function structuredCalls(response: unknown): Record<string, unknown> {
@@ -274,6 +274,11 @@ function formatEmailLine(email: RecordValue): string {
 function getData(value: unknown): RecordValue | undefined {
   const record = asRecord(value);
   return asRecord(record?.data);
+}
+
+function getDataValue(value: unknown): unknown {
+  const record = asRecord(value);
+  return record?.data;
 }
 
 function arrayFromWrapped(value: unknown, key: string): RecordValue[] {
