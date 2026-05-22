@@ -133,10 +133,17 @@ export class OnePageCrmClient {
     return this.request("POST", `/contacts/${encodeURIComponent(params.contactId)}/notes`, { body });
   }
 
-  async listNotes(params: { contactId: string; page?: number; perPage?: number }): Promise<unknown> {
-    return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
-      query: { page: params.page, per_page: params.perPage }
-    });
+  async listNotes(params: { contactId?: string; page?: number; perPage?: number }): Promise<unknown> {
+    if (params.contactId) {
+      return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
+        query: { page: params.page, per_page: params.perPage }
+      });
+    } else {
+      // Global notes endpoint - list recent notes across all contacts
+      return this.request("GET", "/notes", {
+        query: { page: params.page, per_page: params.perPage }
+      });
+    }
   }
 
   async listDeals(params: {
