@@ -151,6 +151,10 @@ export function describeEmails(response: unknown): string {
   return emails.map((email, index) => `${index + 1}. ${formatEmailLine(email)}`).join("\n");
 }
 
+export function structuredActions(response: unknown): Record<string, unknown> {
+  return paginated("actions", arrayFromWrapped(getData(response)?.actions, "action").map(actionSummary), response);
+}
+
 export function structuredNotes(response: unknown): Record<string, unknown> {
   return paginated("notes", arrayFromWrapped(getData(response)?.notes, "note").map(noteSummary), response);
 }
@@ -334,13 +338,32 @@ function paginated(key: string, items: unknown[], response: unknown): Record<str
   };
 }
 
+function actionSummary(action: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(action.id),
+    text: stringOrUndefined(action.text),
+    status: stringOrUndefined(action.status),
+    date: stringOrUndefined(action.date),
+    contact_id: stringOrUndefined(action.contact_id),
+    contact_name: stringOrUndefined(action.contact_name),
+    company_id: stringOrUndefined(action.company_id),
+    company_name: stringOrUndefined(action.company_name),
+    assignee_id: stringOrUndefined(action.assignee_id),
+    assignee_name: stringOrUndefined(action.assignee_name),
+    completed_at: action.done === true ? stringOrUndefined(action.completed_at) : undefined,
+    completed_by_name: action.done === true ? stringOrUndefined(action.completed_by_name) : undefined
+  };
+}
+
 function noteSummary(note: RecordValue): Record<string, unknown> {
   return {
     id: stringOrUndefined(note.id),
     text: stringOrUndefined(note.text),
     created_at: stringOrUndefined(note.created_at),
     author_id: stringOrUndefined(note.author_id) ?? stringOrUndefined(note.user_id),
-    author_name: stringOrUndefined(note.author_name) ?? stringOrUndefined(note.author)
+    author_name: stringOrUndefined(note.author_name) ?? stringOrUndefined(note.author),
+    contact_id: stringOrUndefined(note.contact_id),
+    contact_name: stringOrUndefined(note.contact_name)
   };
 }
 
@@ -351,8 +374,12 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     value: numberOrUndefined(deal.amount) ?? numberOrUndefined(deal.total_amount),
     stage: numberOrUndefined(deal.stage),
     status: normalizeDealStatus(stringOrUndefined(deal.status)),
+    contact_id: stringOrUndefined(deal.contact_id),
+    contact_name: stringOrUndefined(deal.contact_name),
+    owner_id: stringOrUndefined(deal.owner_id),
+    owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
-    owner_id: stringOrUndefined(deal.owner_id)
+    created_at: stringOrUndefined(deal.created_at)
   };
 }
 
@@ -361,7 +388,8 @@ function userSummary(user: RecordValue): Record<string, unknown> {
     id: stringOrUndefined(user.id),
     first_name: stringOrUndefined(user.first_name),
     last_name: stringOrUndefined(user.last_name),
-    email: stringOrUndefined(user.email)
+    email: stringOrUndefined(user.email),
+    active: typeof user.active === "boolean" ? user.active : undefined
   };
 }
 
@@ -369,10 +397,12 @@ function callSummary(call: RecordValue): Record<string, unknown> {
   return {
     id: stringOrUndefined(call.id),
     contact_id: stringOrUndefined(call.contact_id),
+    contact_name: stringOrUndefined(call.contact_name),
     text: stringOrUndefined(call.text),
     created_at: stringOrUndefined(call.created_at),
-    call_time_int: numberOrUndefined(call.call_time_int),
+    author_id: stringOrUndefined(call.author_id),
     author_name: stringOrUndefined(call.author_name) ?? stringOrUndefined(call.author),
+    call_time_int: numberOrUndefined(call.call_time_int),
     phone_number: stringOrUndefined(call.phone_number),
     call_result: stringOrUndefined(call.call_result),
     recording_link: stringOrUndefined(call.recording_link)
@@ -382,8 +412,13 @@ function callSummary(call: RecordValue): Record<string, unknown> {
 function emailSummary(email: RecordValue): Record<string, unknown> {
   return {
     id: stringOrUndefined(email.id),
+    contact_id: stringOrUndefined(email.contact_id),
+    contact_name: stringOrUndefined(email.contact_name),
     type: stringOrUndefined(email.type),
     send_time: stringOrUndefined(email.send_time),
+    created_at: stringOrUndefined(email.created_at),
+    author_id: stringOrUndefined(email.author_id),
+    author_name: stringOrUndefined(email.author_name),
     sender: stringOrUndefined(email.sender),
     recipients: email.recipients,
     subject: stringOrUndefined(email.subject),
