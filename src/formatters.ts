@@ -2,70 +2,198 @@ import { OnePageCrmApiError } from "./onePageCrmClient.js";
 
 type RecordValue = Record<string, unknown>;
 
-export function successResult(text: string) {
-  return { content: [{ type: "text" as const, text }] };
+export function successResult(text: string, structuredContent?: unknown) {
+  const result: {
+    content: Array<{ type: "text"; text: string }>;
+    structuredContent?: Record<string, unknown>;
+  } = {
+    content: [{ type: "text" as const, text }],
+  };
+
+  const structuredRecord = asRecord(structuredContent);
+  if (structuredRecord) {
+    result.structuredContent = structuredRecord;
+  }
+
+  return result;
 }
 
 export function errorResult(error: unknown) {
-  return { isError: true, content: [{ type: "text" as const, text: formatError(error) }] };
+  return {
+    isError: true,
+    content: [{ type: "text" as const, text: formatError(error) }]
+  };
 }
 
 export function formatError(error: unknown): string {
   if (error instanceof OnePageCrmApiError) {
     return error.crmMessage ? `${error.message} OnePage CRM said: ${error.crmMessage}` : error.message;
   }
-  return error instanceof Error ? error.message : "Something went wrong while talking to OnePage CRM.";
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Something went wrong while talking to OnePage CRM.";
 }
 
 export function describeContactSearch(response: unknown): string {
   const data = getData(response);
   const items = arrayFromWrapped(data?.contacts, "contact");
-  if (items.length === 0) return "No contacts were found.";
+  if (items.length === 0) {
+    return "No contacts were found.";
+  }
+
   const total = numberOrUndefined(data?.total_count) ?? items.length;
   const lines = items.slice(0, 10).map((contact, index) => `${index + 1}. ${formatContactLine(contact)}`);
-  return [`Found ${items.length} contact${items.length === 1 ? "" : "s"} (${total} total).`, ...lines].join("\n");
+  return [`Found ${items.length} contact${items.length === 1 ? "" : "s"}${total ? ` (${total} total)` : ""}.`, ...lines].join(
+    "\n"
+  );
 }
 
 export function describeContact(response: unknown): string {
   const data = getData(response);
   const contact = asRecord(data?.contact);
-  if (!contact) return "The contact was returned, but the response did not include contact details.";
+  if (!contact) {
+    return "The contact was returned, but the response did not include contact details.";
+  }
+
+  const nextAction = asRecord(data?.next_action);
   const lines = [formatContactLine(contact)];
   const jobTitle = stringOrUndefined(contact.job_title);
   const background = stringOrUndefined(contact.background);
-  const nextAction = asRecord(data?.next_action);
-  if (jobTitle) lines.push(`Job title: ${jobTitle}`);
-  if (background) lines.push(`Background: ${background}`);
-  if (nextAction) lines.push(`Next action: ${formatActionLine(nextAction)}`);
+
+  if (jobTitle) {
+    lines.push(`Job title: ${jobTitle}`);
+  }
+  if (background) {
+    lines.push(`Background: ${background}`);
+  }
+  if (nextAction) {
+    lines.push(`Next action: ${formatActionLine(nextAction)}`);
+  }
+
   return lines.join("\n");
 }
 
 export function describeActions(response: unknown): string {
   const data = getData(response);
   const actions = arrayFromWrapped(data?.actions, "action");
-  if (actions.length === 0) return "No open tasks were found.";
+  if (actions.length === 0) {
+    return "No open tasks were found.";
+  }
+
   const total = numberOrUndefined(data?.total_count) ?? actions.length;
   const lines = actions.slice(0, 20).map((action, index) => `${index + 1}. ${formatActionLine(action)}`);
-  return [`Found ${actions.length} task${actions.length === 1 ? "" : "s"} (${total} total).`, ...lines].join("\n");
+  return [`Found ${actions.length} task${actions.length === 1 ? "" : "s"}${total ? ` (${total} total)` : ""}.`, ...lines].join(
+    "\n"
+  );
 }
 
 export function describeCreatedAction(response: unknown): string {
   const action = asRecord(getData(response)?.action);
-  return action ? `Created task: ${formatActionLine(action)}` : "The task was created.";
+  if (!action) {
+    return "The task was created.";
+  }
+  return `Created task: ${formatActionLine(action)}`;
 }
 
 export function describeNote(response: unknown): string {
   const note = asRecord(getData(response)?.note);
-  if (!note) return "The note was added.";
+  if (!note) {
+    return "The note was added.";
+  }
   const id = stringOrUndefined(note.id);
   const date = stringOrUndefined(note.date);
   return `Added note${id ? ` ${id}` : ""}${date ? ` dated ${date}` : ""}.`;
 }
 
+export function describeNotes(response: unknown): string {
+  const notes = arrayFromWrapped(getData(response)?.notes, "note");
+  if (notes.length === 0) {
+    return "No notes were found.";
+  }
+  return notes.map((note, index) => `${index + 1}. ${formatNoteLine(note)}`).join("\n");
+}
+
+export function describeDeals(response: unknown): string {
+  const deals = arrayFromWrapped(getData(response)?.deals, "deal");
+  if (deals.length === 0) {
+    return "No deals were found.";
+  }
+  return deals.map((deal, index) => `${index + 1}. ${formatDealLine(deal)}`).join("\n");
+}
+
+export function describeDeal(response: unknown): string {
+  const deal = asRecord(getData(response)?.deal);
+  return deal ? formatDealLine(deal) : "The deal was returned, but the response did not include deal details.";
+}
+
+export function describeUsers(response: unknown): string {
+  const users = arrayFromWrapped(getData(response), "user");
+  if (users.length === 0) {
+    return "No users were found.";
+  }
+  return users.map((user, index) => `${index + 1}. ${formatUserLine(user)}`).join("\n");
+}
+
+export function describeCalls(response: unknown): string {
+  const calls = arrayFromWrapped(getData(response)?.calls, "call");
+  if (calls.length === 0) {
+    return "No calls were found.";
+  }
+  return calls.map((call, index) => `${index + 1}. ${formatCallLine(call)}`).join("\n");
+}
+
+export function describeEmails(response: unknown): string {
+  const emails = arrayFromWrapped(getData(response)?.email_messages, "email_message");
+  if (emails.length === 0) {
+    return "No emails were found.";
+  }
+  return emails.map((email, index) => `${index + 1}. ${formatEmailLine(email)}`).join("\n");
+}
+
+export function structuredNotes(response: unknown): Record<string, unknown> {
+  return paginated("notes", arrayFromWrapped(getData(response)?.notes, "note").map(noteSummary), response);
+}
+
+export function structuredCreatedNote(response: unknown): Record<string, unknown> {
+  const note = asRecord(getData(response)?.note);
+  return { note, summary: note ? noteSummary(note) : undefined };
+}
+
+export function structuredDeals(response: unknown): Record<string, unknown> {
+  return paginated("deals", arrayFromWrapped(getData(response)?.deals, "deal").map(dealSummary), response);
+}
+
+export function structuredDeal(response: unknown): Record<string, unknown> {
+  const deal = asRecord(getData(response)?.deal);
+  return { deal: deal ? dealSummary(deal) : undefined };
+}
+
+export function structuredUsers(response: unknown): Record<string, unknown> {
+  return { users: arrayFromWrapped(getData(response), "user").map(userSummary) };
+}
+
+export function structuredCalls(response: unknown): Record<string, unknown> {
+  return paginated("calls", arrayFromWrapped(getData(response)?.calls, "call").map(callSummary), response);
+}
+
+export function structuredEmails(response: unknown): Record<string, unknown> {
+  return paginated(
+    "emails",
+    arrayFromWrapped(getData(response)?.email_messages, "email_message").map(emailSummary),
+    response
+  );
+}
+
 export function describeDoneAction(response: unknown): string {
   const action = asRecord(getData(response)?.action);
-  if (!action) return "The task was marked done.";
-  return `Task is done: ${formatActionLine(action)}`;
+  if (!action) {
+    return "The task was marked done.";
+  }
+  if (action.done === true || action.status === "done") {
+    return `Task is done: ${formatActionLine(action)}`;
+  }
+  return `Updated task: ${formatActionLine(action)}`;
 }
 
 function formatContactLine(contact: RecordValue): string {
@@ -83,16 +211,75 @@ function formatActionLine(action: RecordValue): string {
   const status = stringOrUndefined(action.status);
   const date = stringOrUndefined(action.date);
   const id = stringOrUndefined(action.id);
-  const pieces = [status ? `status: ${status}` : undefined, date ? `due: ${date}` : undefined, id ? `ID: ${id}` : undefined].filter(Boolean);
-  return pieces.length ? `${text} (${pieces.join(" | ")})` : text;
+  const pieces = [status ? `status: ${status}` : undefined, date ? `due: ${date}` : undefined, id ? `ID: ${id}` : undefined];
+  return `${text}${pieces.length ? ` (${pieces.filter(Boolean).join(" | ")})` : ""}`;
+}
+
+function formatNoteLine(note: RecordValue): string {
+  const text = stringOrUndefined(note.text) ?? "Untitled note";
+  const author = stringOrUndefined(note.author_name) ?? stringOrUndefined(note.author);
+  const created = stringOrUndefined(note.created_at) ?? stringOrUndefined(note.date);
+  const id = stringOrUndefined(note.id);
+  return [text, author ? `author: ${author}` : undefined, created ? `created: ${created}` : undefined, id ? `ID: ${id}` : undefined]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatDealLine(deal: RecordValue): string {
+  const name = stringOrUndefined(deal.name) ?? "Untitled deal";
+  const id = stringOrUndefined(deal.id);
+  const value = numberOrUndefined(deal.amount) ?? numberOrUndefined(deal.total_amount);
+  const status = normalizeDealStatus(stringOrUndefined(deal.status));
+  const stage = numberOrUndefined(deal.stage);
+  const closeDate = stringOrUndefined(deal.expected_close_date) ?? stringOrUndefined(deal.close_date);
+  return [
+    name,
+    value !== undefined ? `value: ${value}` : undefined,
+    stage !== undefined ? `stage: ${stage}` : undefined,
+    status ? `status: ${status}` : undefined,
+    closeDate ? `close: ${closeDate}` : undefined,
+    id ? `ID: ${id}` : undefined
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatUserLine(user: RecordValue): string {
+  const name = joinName(user.first_name, user.last_name) ?? "Unnamed user";
+  const email = stringOrUndefined(user.email);
+  const id = stringOrUndefined(user.id);
+  return [name, email, id ? `ID: ${id}` : undefined].filter(Boolean).join(" | ");
+}
+
+function formatCallLine(call: RecordValue): string {
+  const text = stringOrUndefined(call.text) ?? "Call";
+  const author = stringOrUndefined(call.author_name) ?? stringOrUndefined(call.author);
+  const created = stringOrUndefined(call.created_at);
+  const id = stringOrUndefined(call.id);
+  return [text, author ? `author: ${author}` : undefined, created ? `created: ${created}` : undefined, id ? `ID: ${id}` : undefined]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatEmailLine(email: RecordValue): string {
+  const subject = stringOrUndefined(email.subject) ?? "No subject";
+  const sender = stringOrUndefined(email.sender);
+  const sent = stringOrUndefined(email.send_time) ?? stringOrUndefined(email.created_at);
+  const id = stringOrUndefined(email.id);
+  return [subject, sender ? `from: ${sender}` : undefined, sent ? `sent: ${sent}` : undefined, id ? `ID: ${id}` : undefined]
+    .filter(Boolean)
+    .join(" | ");
 }
 
 function getData(value: unknown): RecordValue | undefined {
-  return asRecord(asRecord(value)?.data);
+  const record = asRecord(value);
+  return asRecord(record?.data);
 }
 
 function arrayFromWrapped(value: unknown, key: string): RecordValue[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
   return value.flatMap((item) => {
     const record = asRecord(item);
     const wrapped = asRecord(record?.[key]);
@@ -101,10 +288,15 @@ function arrayFromWrapped(value: unknown, key: string): RecordValue[] {
 }
 
 function firstListValue(value: unknown): string | undefined {
-  if (!Array.isArray(value)) return undefined;
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
   for (const item of value) {
-    const raw = stringOrUndefined(asRecord(item)?.value);
-    if (raw) return raw;
+    const record = asRecord(item);
+    const raw = stringOrUndefined(record?.value);
+    if (raw) {
+      return raw;
+    }
   }
   return undefined;
 }
@@ -124,4 +316,79 @@ function stringOrUndefined(value: unknown): string | undefined {
 
 function numberOrUndefined(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function paginated(key: string, items: unknown[], response: unknown): Record<string, unknown> {
+  const data = getData(response);
+  return {
+    [key]: items,
+    total_count: numberOrUndefined(data?.total_count),
+    page: numberOrUndefined(data?.page),
+    per_page: numberOrUndefined(data?.per_page),
+    max_page: numberOrUndefined(data?.max_page)
+  };
+}
+
+function noteSummary(note: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(note.id),
+    text: stringOrUndefined(note.text),
+    created_at: stringOrUndefined(note.created_at),
+    author_id: stringOrUndefined(note.author_id) ?? stringOrUndefined(note.user_id),
+    author_name: stringOrUndefined(note.author_name) ?? stringOrUndefined(note.author)
+  };
+}
+
+function dealSummary(deal: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(deal.id),
+    name: stringOrUndefined(deal.name),
+    value: numberOrUndefined(deal.amount) ?? numberOrUndefined(deal.total_amount),
+    stage: numberOrUndefined(deal.stage),
+    status: normalizeDealStatus(stringOrUndefined(deal.status)),
+    expected_close_date: stringOrUndefined(deal.expected_close_date),
+    owner_id: stringOrUndefined(deal.owner_id)
+  };
+}
+
+function userSummary(user: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(user.id),
+    first_name: stringOrUndefined(user.first_name),
+    last_name: stringOrUndefined(user.last_name),
+    email: stringOrUndefined(user.email)
+  };
+}
+
+function callSummary(call: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(call.id),
+    contact_id: stringOrUndefined(call.contact_id),
+    text: stringOrUndefined(call.text),
+    created_at: stringOrUndefined(call.created_at),
+    call_time_int: numberOrUndefined(call.call_time_int),
+    author_name: stringOrUndefined(call.author_name) ?? stringOrUndefined(call.author),
+    phone_number: stringOrUndefined(call.phone_number),
+    call_result: stringOrUndefined(call.call_result),
+    recording_link: stringOrUndefined(call.recording_link)
+  };
+}
+
+function emailSummary(email: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(email.id),
+    type: stringOrUndefined(email.type),
+    send_time: stringOrUndefined(email.send_time),
+    sender: stringOrUndefined(email.sender),
+    recipients: email.recipients,
+    subject: stringOrUndefined(email.subject),
+    plain_content: stringOrUndefined(email.plain_content),
+    status: stringOrUndefined(email.status),
+    incoming_email: typeof email.incoming_email === "boolean" ? email.incoming_email : undefined,
+    url: stringOrUndefined(email.url)
+  };
+}
+
+function normalizeDealStatus(status: string | undefined): string | undefined {
+  return status === "pending" ? "open" : status;
 }
