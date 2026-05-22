@@ -21,6 +21,7 @@ export class OnePageCrmApiError extends Error {
 export class OnePageCrmClient {
   private readonly endpoint: string;
   private readonly authorizationHeader: string;
+  private userCache: Map<string, { first_name?: string; last_name?: string }> | null = null;
 
   constructor(config: AppConfig) {
     this.endpoint = config.onePageCrmEndpoint;
@@ -90,7 +91,114 @@ export class OnePageCrmClient {
       query.until = params.toDate;
     }
 
-    return this.request("GET", "/actions", { query });
+    const response = await this.request("GET", "/actions", { query });
+    
+    // Enrich actions with contact_name and assignee_name
+    return await this.enrichActionsResponse(response);
+  }
+
+  private async enrichActionsResponse(response: unknown): Promise<unknown> {
+    if (!isRecord(response) || !isRecord(response.data)) {
+      return response;
+    }
+
+    const data = response.data as Record<string, unknown>;
+    if (!Array.isArray(data.actions)) {
+      return response;
+    }
+
+    // Build a user lookup map for assignee names
+    const userMap = await this.getUserMap();
+
+    // Process each action
+    const enrichedActions = await Promise.all(
+      data.actions.map(async (item: unknown) => {
+        if (!isRecord(item)) return item;
+        
+        const action = isRecord(item.action) ? (item.action as Record<string, unknown>) : item;
+        
+        // Log a sample action on first iteration to inspect structure
+        if (!this.hasLoggedAction) {
+          console.log("Sample action object from OnePageCRM API:", JSON.stringify(action, null, 2));
+          this.hasLoggedAction = true;
+        }
+
+        // Enrich contact info
+        if (action.contact_id && !action.contact_name) {
+          try {
+            const contactResponse = await this.getContact(String(action.contact_id));
+            const contactData = isRecord(contactResponse) && isRecord(contactResponse.data) 
+              ? contactResponse.data 
+              : contactResponse;
+            const contact = isRecord(contactData?.contact) ? contactData.contact : null;
+            
+            if (contact) {
+              const firstName = String(contact.first_name || "").trim();
+              const lastName = String(contact.last_name || "").trim();
+              action.contact_name = [firstName, lastName].filter(Boolean).join(" ") || undefined;
+              action.company_name = String(contact.company_name || "").trim() || undefined;
+            }
+          } catch (error) {
+            console.error(`Failed to enrich contact ${action.contact_id}:`, error instanceof Error ? error.message : error);
+          }
+        }
+
+        // Enrich assignee info
+        if ((action.assignee_id || action.user_id) && !action.assignee_name) {
+          const userId = String(action.assignee_id || action.user_id);
+          const user = userMap.get(userId);
+          if (user) {
+            const firstName = String(user.first_name || "").trim();
+            const lastName = String(user.last_name || "").trim();
+            action.assignee_name = [firstName, lastName].filter(Boolean).join(" ") || undefined;
+            action.assignee_id = userId;
+          }
+        }
+
+        // Return in wrapped format if it came wrapped
+        return isRecord(item.action) ? { action } : item;
+      })
+    );
+
+    return {
+      ...response,
+      data: {
+        ...data,
+        actions: enrichedActions
+      }
+    };
+  }
+
+  private hasLoggedAction = false;
+
+  private async getUserMap(): Promise<Map<string, Record<string, unknown>>> {
+    if (this.userCache) {
+      return this.userCache;
+    }
+
+    const userMap = new Map<string, Record<string, unknown>>();
+    try {
+      const usersResponse = await this.listUsers();
+      if (isRecord(usersResponse) && isRecord(usersResponse.data)) {
+        const data = usersResponse.data as Record<string, unknown>;
+        const users = Array.isArray(data.users) ? data.users : [];
+        
+        for (const item of users) {
+          if (isRecord(item)) {
+            const user = isRecord(item.user) ? item.user : item;
+            const userId = String(user.id || "").trim();
+            if (userId) {
+              userMap.set(userId, user as Record<string, unknown>);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load user map:", error instanceof Error ? error.message : error);
+    }
+
+    this.userCache = userMap;
+    return userMap;
   }
 
   async createAction(params: {
