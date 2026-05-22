@@ -1,6 +1,16 @@
 import type { AppConfig } from "./config.js";
 
 type QueryValue = string | number | boolean | undefined | null;
+type RawContact = Record<string, unknown> & {
+  id?: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+};
+type RawAction = Record<string, unknown> & {
+  contact?: RawContact;
+};
 
 export type OnePageCrmContact = Record<string, unknown>;
 export type OnePageCrmAction = Record<string, unknown>;
@@ -21,7 +31,8 @@ export class OnePageCrmApiError extends Error {
 export class OnePageCrmClient {
   private readonly endpoint: string;
   private readonly authorizationHeader: string;
-  private userCache: Map<string, { first_name?: string; last_name?: string }> | null = null;
+  private userCache: Map<string, Record<string, unknown>> | null = null;
+  private hasLoggedAction = false;
 
   constructor(config: AppConfig) {
     this.endpoint = config.onePageCrmEndpoint;
@@ -92,9 +103,7 @@ export class OnePageCrmClient {
     }
 
     const response = await this.request("GET", "/actions", { query });
-    
-    // Enrich actions with contact_name and assignee_name
-    return await this.enrichActionsResponse(response);
+    return this.enrichActionsResponse(response);
   }
 
   private async enrichActionsResponse(response: unknown): Promise<unknown> {
@@ -107,43 +116,43 @@ export class OnePageCrmClient {
       return response;
     }
 
-    // Build a user lookup map for assignee names
     const userMap = await this.getUserMap();
-
-    // Process each action
     const enrichedActions = await Promise.all(
       data.actions.map(async (item: unknown) => {
-        if (!isRecord(item)) return item;
-        
-        const action = isRecord(item.action) ? (item.action as Record<string, unknown>) : item;
-        
-        // Log a sample action on first iteration to inspect structure
+        if (!isRecord(item)) {
+          return item;
+        }
+
+        const action = (isRecord(item.action) ? item.action : item) as RawAction;
+
         if (!this.hasLoggedAction) {
           console.log("Sample action object from OnePageCRM API:", JSON.stringify(action, null, 2));
           this.hasLoggedAction = true;
         }
 
-        // Enrich contact info
-        if (action.contact_id && !action.contact_name) {
+        const contactId = stringOrUndefined(action.contact_id) ?? stringOrUndefined(action.contact?.id);
+        const contactName = stringOrUndefined(action.contact_name) ?? stringOrUndefined(action.contact?.name);
+        if (contactId && !contactName) {
           try {
-            const contactResponse = await this.getContact(String(action.contact_id));
-            const contactData = isRecord(contactResponse) && isRecord(contactResponse.data) 
-              ? contactResponse.data 
-              : contactResponse;
-            const contact = isRecord(contactData?.contact) ? contactData.contact : null;
-            
+            const contactResponse = await this.getContact(contactId);
+            const contactData =
+              isRecord(contactResponse) && isRecord(contactResponse.data) ? contactResponse.data : contactResponse;
+            const contact = isRecord((contactData as Record<string, unknown> | undefined)?.contact)
+              ? ((contactData as Record<string, unknown>).contact as RawContact)
+              : undefined;
+
             if (contact) {
               const firstName = String(contact.first_name || "").trim();
               const lastName = String(contact.last_name || "").trim();
+              action.contact_id = contactId;
               action.contact_name = [firstName, lastName].filter(Boolean).join(" ") || undefined;
               action.company_name = String(contact.company_name || "").trim() || undefined;
             }
           } catch (error) {
-            console.error(`Failed to enrich contact ${action.contact_id}:`, error instanceof Error ? error.message : error);
+            console.error(`Failed to enrich contact ${contactId}:`, error instanceof Error ? error.message : error);
           }
         }
 
-        // Enrich assignee info
         if ((action.assignee_id || action.user_id) && !action.assignee_name) {
           const userId = String(action.assignee_id || action.user_id);
           const user = userMap.get(userId);
@@ -155,7 +164,6 @@ export class OnePageCrmClient {
           }
         }
 
-        // Return in wrapped format if it came wrapped
         return isRecord(item.action) ? { action } : item;
       })
     );
@@ -169,8 +177,6 @@ export class OnePageCrmClient {
     };
   }
 
-  private hasLoggedAction = false;
-
   private async getUserMap(): Promise<Map<string, Record<string, unknown>>> {
     if (this.userCache) {
       return this.userCache;
@@ -179,17 +185,15 @@ export class OnePageCrmClient {
     const userMap = new Map<string, Record<string, unknown>>();
     try {
       const usersResponse = await this.listUsers();
-      if (isRecord(usersResponse) && isRecord(usersResponse.data)) {
-        const data = usersResponse.data as Record<string, unknown>;
-        const users = Array.isArray(data.users) ? data.users : [];
-        
-        for (const item of users) {
-          if (isRecord(item)) {
-            const user = isRecord(item.user) ? item.user : item;
-            const userId = String(user.id || "").trim();
-            if (userId) {
-              userMap.set(userId, user as Record<string, unknown>);
-            }
+      const data = isRecord(usersResponse) ? usersResponse.data : undefined;
+      const users = Array.isArray(data) ? data : isRecord(data) && Array.isArray(data.users) ? data.users : [];
+
+      for (const item of users) {
+        if (isRecord(item)) {
+          const user = isRecord(item.user) ? item.user : item;
+          const userId = String(user.id || "").trim();
+          if (userId) {
+            userMap.set(userId, user as Record<string, unknown>);
           }
         }
       }
@@ -246,12 +250,11 @@ export class OnePageCrmClient {
       return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
         query: { page: params.page, per_page: params.perPage }
       });
-    } else {
-      // Global notes endpoint - list recent notes across all contacts
-      return this.request("GET", "/notes", {
-        query: { page: params.page, per_page: params.perPage }
-      });
     }
+
+    return this.request("GET", "/notes", {
+      query: { page: params.page, per_page: params.perPage }
+    });
   }
 
   async listDeals(params: {
@@ -445,4 +448,8 @@ function friendlyStatusMessage(status: number): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
