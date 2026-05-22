@@ -101,7 +101,13 @@ export function createMcpServer(config: AppConfig): McpServer {
       inputSchema: {
         contactId: idSchema.optional().describe("Only show tasks linked to this contact ID."),
         companyId: idSchema.optional().describe("Only show tasks linked to this company/organization ID."),
-        assigneeId: idSchema.optional().describe("Only show tasks assigned to this OnePage CRM user ID."),
+        assigneeId: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Only show tasks assigned to this OnePage CRM user ID."),
         status: actionStatusSchema.optional().describe("Optional task status filter."),
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
         fromDate: dateSchema.optional().describe("Only tasks due on or after this date."),
@@ -148,7 +154,13 @@ export function createMcpServer(config: AppConfig): McpServer {
           .optional()
           .describe("Optional status. If omitted, the server chooses asap, date, or date_time."),
         exactTime: z.number().int().positive().optional().describe("Optional UNIX timestamp in seconds for exact due time."),
-        assigneeId: idSchema.optional().describe("Optional OnePage CRM user ID to assign the task to."),
+        assigneeId: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Optional OnePage CRM user ID to assign the task to."),
         position: z.number().int().positive().optional().describe("Optional position for queued tasks.")
       }
     },
