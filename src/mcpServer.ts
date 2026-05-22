@@ -101,12 +101,7 @@ export function createMcpServer(config: AppConfig): McpServer {
       annotations: { readOnlyHint: true },
       inputSchema: {
         contactId: idSchema.optional().describe("Only show tasks linked to this contact ID."),
-        companyId: {
-          type: "string",
-          description: "Only show tasks linked to this company/organization ID.",
-          minLength: 1,
-          maxLength: 100
-        },
+        companyId: z.string().trim().min(1).max(100).optional().describe("Only show tasks linked to this company/organization ID."),
         assigneeId: z
           .string()
           .trim()
@@ -117,11 +112,7 @@ export function createMcpServer(config: AppConfig): McpServer {
         status: actionStatusSchema.optional().describe("Optional task status filter."),
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
         fromDate: dateSchema.optional().describe("Only tasks due on or after this date."),
-        toDate: {
-          type: "string",
-          description: "Only tasks due on or before this date.",
-          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
-        },
+        toDate: dateSchema.optional().describe("Only tasks due on or before this date."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100.")
       }
