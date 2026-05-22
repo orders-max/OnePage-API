@@ -15,6 +15,7 @@ import {
   describeNotes,
   describeUsers,
   errorResult,
+  structuredActions,
   structuredCalls,
   structuredCreatedNote,
   structuredDeal,
@@ -100,7 +101,12 @@ export function createMcpServer(config: AppConfig): McpServer {
       annotations: { readOnlyHint: true },
       inputSchema: {
         contactId: idSchema.optional().describe("Only show tasks linked to this contact ID."),
-        companyId: idSchema.optional().describe("Only show tasks linked to this company/organization ID."),
+        companyId: {
+          type: "string",
+          description: "Only show tasks linked to this company/organization ID.",
+          minLength: 1,
+          maxLength: 100
+        },
         assigneeId: z
           .string()
           .trim()
@@ -111,7 +117,11 @@ export function createMcpServer(config: AppConfig): McpServer {
         status: actionStatusSchema.optional().describe("Optional task status filter."),
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
         fromDate: dateSchema.optional().describe("Only tasks due on or after this date."),
-        toDate: dateSchema.optional().describe("Only tasks due on or before this date."),
+        toDate: {
+          type: "string",
+          description: "Only tasks due on or before this date.",
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+        },
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100.")
       }
@@ -132,7 +142,7 @@ export function createMcpServer(config: AppConfig): McpServer {
           page: input.page ?? 1,
           perPage: input.perPage ?? 20
         });
-        return successResult(describeActions(response), response);
+        return successResult(describeActions(response), structuredActions(response));
       } catch (error) {
         return errorResult(error);
       }
@@ -178,10 +188,10 @@ export function createMcpServer(config: AppConfig): McpServer {
     "list_notes",
     {
       title: "List Notes",
-      description: "List notes for a OnePage CRM contact.",
+      description: "List notes for a OnePage CRM contact. Optionally omit contactId to get recent notes across all contacts.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        contactId: idSchema.describe("The OnePage CRM contact ID."),
+        contactId: idSchema.optional().describe("Optional OnePage CRM contact ID. If omitted, returns notes from all contacts."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of notes to return. Maximum 100.")
       }
