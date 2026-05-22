@@ -214,8 +214,16 @@ function formatActionLine(action: RecordValue): string {
   const text = stringOrUndefined(action.text) ?? stringOrUndefined(action.name) ?? "Untitled task";
   const status = stringOrUndefined(action.status);
   const date = stringOrUndefined(action.date);
+  const contactName = stringOrUndefined(action.contact_name);
+  const assigneeName = stringOrUndefined(action.assignee_name);
   const id = stringOrUndefined(action.id);
-  const pieces = [status ? `status: ${status}` : undefined, date ? `due: ${date}` : undefined, id ? `ID: ${id}` : undefined];
+  const pieces = [
+    contactName ? `contact: ${contactName}` : undefined,
+    assigneeName ? `assigned to: ${assigneeName}` : undefined,
+    status ? `status: ${status}` : undefined,
+    date ? `due: ${date}` : undefined,
+    id ? `ID: ${id}` : undefined
+  ];
   return `${text}${pieces.length ? ` (${pieces.filter(Boolean).join(" | ")})` : ""}`;
 }
 
