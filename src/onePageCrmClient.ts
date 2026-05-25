@@ -32,7 +32,6 @@ export class OnePageCrmClient {
   private readonly endpoint: string;
   private readonly authorizationHeader: string;
   private userCache: Map<string, Record<string, unknown>> | null = null;
-  private hasLoggedAction = false;
 
   constructor(config: AppConfig) {
     this.endpoint = config.onePageCrmEndpoint;
@@ -105,29 +104,114 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
+    dateFilter?: "today" | "overdue" | "due";
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    perPage?: number;
+    fetchAll?: boolean;
+  }): Promise<unknown> {
+    if (params.fetchAll) {
+      return this.listAllActions(params);
+    }
+
+    const response = await this.request("GET", "/actions.json", { query: this.buildActionsQuery(params) });
+    return this.enrichActionsResponse(response);
+  }
+
+  private async listAllActions(params: {
+    contactId?: string;
+    companyId?: string;
+    assigneeId?: string;
+    status?: string;
+    includeDone?: boolean;
+    dateFilter?: "today" | "overdue" | "due";
     fromDate?: string;
     toDate?: string;
     page?: number;
     perPage?: number;
   }): Promise<unknown> {
+    const perPage = params.perPage ?? 100;
+    const firstPage = params.page ?? 1;
+    let page = firstPage;
+    let lastResponse: unknown;
+    let lastData: Record<string, unknown> | undefined;
+    let totalCount: number | undefined;
+    let maxPage: number | undefined;
+    const actions: unknown[] = [];
+
+    for (let requestCount = 0; requestCount < 1000; requestCount += 1) {
+      const response = await this.request("GET", "/actions.json", {
+        query: this.buildActionsQuery({ ...params, page, perPage })
+      });
+      const data = isRecord(response) && isRecord(response.data) ? response.data : undefined;
+      const pageActions = Array.isArray(data?.actions) ? data.actions : [];
+
+      lastResponse = response;
+      lastData = data;
+      actions.push(...pageActions);
+      totalCount = numberOrUndefined(data?.total_count) ?? totalCount;
+      maxPage = numberOrUndefined(data?.max_page) ?? maxPage;
+
+      if (maxPage !== undefined && page >= maxPage) {
+        break;
+      }
+      if (totalCount !== undefined && actions.length >= totalCount) {
+        break;
+      }
+      if (pageActions.length === 0) {
+        break;
+      }
+      if (maxPage === undefined && totalCount === undefined && pageActions.length < perPage) {
+        break;
+      }
+      page += 1;
+    }
+
+    const mergedResponse = isRecord(lastResponse)
+      ? {
+          ...lastResponse,
+          data: {
+            ...(lastData ?? {}),
+            actions,
+            total_count: totalCount ?? actions.length,
+            page: firstPage,
+            per_page: perPage,
+            max_page: maxPage ?? page
+          }
+        }
+      : lastResponse;
+
+    return this.enrichActionsResponse(mergedResponse);
+  }
+
+  private buildActionsQuery(params: {
+    contactId?: string;
+    companyId?: string;
+    assigneeId?: string;
+    status?: string;
+    includeDone?: boolean;
+    dateFilter?: "today" | "overdue" | "due";
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    perPage?: number;
+  }): Record<string, QueryValue> {
+    const dateFilter = params.dateFilter ?? (params.fromDate || params.toDate ? "due" : undefined);
     const query: Record<string, QueryValue> = {
       contact_id: params.contactId,
       company_id: params.companyId,
       assignee_id: params.assigneeId,
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
+      date_filter: dateFilter,
+      date_from: params.fromDate,
+      date_to: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
 
-    if (params.fromDate || params.toDate) {
-      query.date_filter = "date";
-      query.since = params.fromDate;
-      query.until = params.toDate;
-    }
-
-    const response = await this.request("GET", "/actions", { query });
-    return this.enrichActionsResponse(response);
+    return query;
   }
 
   private async enrichActionsResponse(response: unknown): Promise<unknown> {
@@ -148,11 +232,6 @@ export class OnePageCrmClient {
         }
 
         const action = (isRecord(item.action) ? item.action : item) as RawAction;
-
-        if (!this.hasLoggedAction) {
-          console.log("Sample action object from OnePageCRM API:", JSON.stringify(action, null, 2));
-          this.hasLoggedAction = true;
-        }
 
         const contactId = stringOrUndefined(action.contact_id) ?? stringOrUndefined(action.contact?.id);
         const contactName = stringOrUndefined(action.contact_name) ?? stringOrUndefined(action.contact?.name);
@@ -476,4 +555,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
