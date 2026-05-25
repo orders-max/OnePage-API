@@ -82,8 +82,13 @@ export function describeActions(response: unknown): string {
   }
 
   const total = numberOrUndefined(data?.total_count) ?? actions.length;
-  const lines = actions.slice(0, 20).map((action, index) => `${index + 1}. ${formatActionLine(action)}`);
-  return [`Found ${actions.length} task${actions.length === 1 ? "" : "s"}${total ? ` (${total} total)` : ""}.`, ...lines].join(
+  const displayLimit = 100;
+  const lines = actions.slice(0, displayLimit).map((action, index) => `${index + 1}. ${formatActionLine(action)}`);
+  const extra =
+    actions.length > displayLimit
+      ? [`Showing the first ${displayLimit} tasks in text. The structured response includes all ${actions.length}.`]
+      : [];
+  return [`Found ${actions.length} task${actions.length === 1 ? "" : "s"}${total ? ` (${total} total)` : ""}.`, ...lines, ...extra].join(
     "\n"
   );
 }
@@ -214,16 +219,8 @@ function formatActionLine(action: RecordValue): string {
   const text = stringOrUndefined(action.text) ?? stringOrUndefined(action.name) ?? "Untitled task";
   const status = stringOrUndefined(action.status);
   const date = stringOrUndefined(action.date);
-  const contactName = stringOrUndefined(action.contact_name);
-  const assigneeName = stringOrUndefined(action.assignee_name);
   const id = stringOrUndefined(action.id);
-  const pieces = [
-    contactName ? `contact: ${contactName}` : undefined,
-    assigneeName ? `assigned to: ${assigneeName}` : undefined,
-    status ? `status: ${status}` : undefined,
-    date ? `due: ${date}` : undefined,
-    id ? `ID: ${id}` : undefined
-  ];
+  const pieces = [status ? `status: ${status}` : undefined, date ? `due: ${date}` : undefined, id ? `ID: ${id}` : undefined];
   return `${text}${pieces.length ? ` (${pieces.filter(Boolean).join(" | ")})` : ""}`;
 }
 
