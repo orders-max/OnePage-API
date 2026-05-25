@@ -75,6 +75,30 @@ export class OnePageCrmClient {
     return this.request("GET", `/contacts/${encodeURIComponent(contactId)}`);
   }
 
+  async createContact(params: {
+    firstName: string;
+    lastName?: string;
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    jobTitle?: string;
+    background?: string;
+    ownerId?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      first_name: params.firstName,
+      last_name: params.lastName,
+      company_name: params.companyName,
+      emails: params.email ? [{ value: params.email }] : undefined,
+      phones: params.phone ? [{ value: params.phone }] : undefined,
+      job_title: params.jobTitle,
+      background: params.background,
+      owner_id: params.ownerId
+    });
+
+    return this.request("POST", "/contacts.json", { body });
+  }
+
   async listActions(params: {
     contactId?: string;
     companyId?: string;
