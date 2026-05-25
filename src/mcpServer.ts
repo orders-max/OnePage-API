@@ -93,6 +93,32 @@ export function createMcpServer(config: AppConfig): McpServer {
   );
 
   server.registerTool(
+    "create_contact",
+    {
+      title: "Create Contact",
+      description: "Create a new contact in OnePage CRM.",
+      inputSchema: {
+        firstName: z.string().trim().min(1).max(100).describe("Contact's first name."),
+        lastName: z.string().trim().min(1).max(100).optional().describe("Contact's last name."),
+        companyName: z.string().trim().min(1).max(100).optional().describe("Company or organization name."),
+        email: z.string().trim().email().optional().describe("Contact's email address."),
+        phone: z.string().trim().min(1).max(50).optional().describe("Contact's phone number."),
+        jobTitle: z.string().trim().min(1).max(100).optional().describe("Contact's job title."),
+        background: z.string().trim().min(1).max(7168).optional().describe("Background notes about the contact."),
+        ownerId: z.string().trim().min(1).max(100).optional().describe("OnePage CRM user ID to assign the contact to.")
+      }
+    },
+    async (input) => {
+      try {
+        const response = await client.createContact(input);
+        return successResult(describeContact(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_tasks",
     {
       title: "List Tasks",
