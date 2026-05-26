@@ -205,8 +205,8 @@ export class OnePageCrmClient {
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
       date_filter: dateFilter,
-      since: params.fromDate,
-      until: params.toDate,
+      date_from: params.fromDate,
+      date_to: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
@@ -390,7 +390,7 @@ export class OnePageCrmClient {
       throw new Error("Provide at least one deal field to update: stage or status.");
     }
 
-    return this.request("PUT", `/deals/${encodeURIComponent(dealId)}`, {
+    return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
       query: { partial: true },
       body
     });
