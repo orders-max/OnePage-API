@@ -32,7 +32,8 @@ const pageSchema = z.number().int().min(1).max(10000).optional();
 const perPageSchema = z.number().int().min(1).max(100).optional();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for example 2026-05-21");
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
-const actionDateFilterSchema = z.enum(["today", "overdue", "due"]);
+const actionDateFilterSchema = z.enum(["created_at", "modified_at", "updated_at", "date", "close_date"]);
+const optionalDateSchema = dateSchema.nullish();
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
 export function createMcpServer(config: AppConfig): McpServer {
@@ -140,9 +141,9 @@ export function createMcpServer(config: AppConfig): McpServer {
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
         dateFilter: actionDateFilterSchema
           .optional()
-          .describe("Native OnePage CRM due-date filter. Use today for tasks due today, overdue for overdue tasks, or due for dated tasks."),
-        fromDate: dateSchema.optional().describe("Only tasks due on or after this date. Sent to OnePage CRM as date_from."),
-        toDate: dateSchema.optional().describe("Only tasks due on or before this date. Sent to OnePage CRM as date_to."),
+          .describe("OnePage CRM date field to filter against. Defaults to date when fromDate or toDate is provided."),
+        fromDate: optionalDateSchema.describe("Only tasks due on or after this date. Sent to OnePage CRM as since."),
+        toDate: optionalDateSchema.describe("Only tasks due on or before this date. Sent to OnePage CRM as until."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100."),
         fetchAll: z
@@ -162,9 +163,9 @@ export function createMcpServer(config: AppConfig): McpServer {
           assigneeId: input.assigneeId,
           status: input.status,
           includeDone: input.includeDone,
-          dateFilter: input.dateFilter,
-          fromDate: input.fromDate,
-          toDate: input.toDate,
+          dateFilter: input.dateFilter ?? undefined,
+          fromDate: input.fromDate ?? undefined,
+          toDate: input.toDate ?? undefined,
           page: input.page ?? 1,
           perPage: input.perPage ?? (input.fetchAll ? 100 : 20),
           fetchAll: input.fetchAll
