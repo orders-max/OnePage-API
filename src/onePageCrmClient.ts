@@ -390,7 +390,7 @@ export class OnePageCrmClient {
       throw new Error("Provide at least one deal field to update: stage or status.");
     }
 
-    return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
+    return this.request("PUT", `/deals/${encodeURIComponent(dealId)}`, {
       query: { partial: true },
       body
     });
@@ -448,6 +448,16 @@ export class OnePageCrmClient {
       }
     }
 
+    // [DEBUG] Log outgoing request details
+    if (path.includes("actions")) {
+      console.log(
+        `[DEBUG] OnePageCRM request URL: ${url.toString()}`
+      );
+      console.log(
+        `[DEBUG] Query params: ${JSON.stringify(options.query ?? {})}`
+      );
+    }
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -465,6 +475,15 @@ export class OnePageCrmClient {
     }
 
     const payload = await readResponsePayload(response);
+    
+    // [DEBUG] Log response status and total_count
+    if (path.includes("actions")) {
+      const data = isRecord(payload.value) && isRecord(payload.value.data) ? payload.value.data : undefined;
+      console.log(
+        `[DEBUG] Response status: ${response.status}, total_count: ${data?.total_count ?? "N/A"}`
+      );
+    }
+    
     if (!response.ok) {
       throw new OnePageCrmApiError(response.status, friendlyStatusMessage(response.status), payload.message);
     }
