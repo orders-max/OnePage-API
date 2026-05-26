@@ -104,7 +104,7 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "today" | "overdue" | "due";
+    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
     fromDate?: string;
     toDate?: string;
     page?: number;
@@ -125,7 +125,7 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "today" | "overdue" | "due";
+    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
     fromDate?: string;
     toDate?: string;
     page?: number;
@@ -191,13 +191,13 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "today" | "overdue" | "due";
+    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
     fromDate?: string;
     toDate?: string;
     page?: number;
     perPage?: number;
   }): Record<string, QueryValue> {
-    const dateFilter = params.dateFilter ?? (params.fromDate || params.toDate ? "due" : undefined);
+    const dateFilter = params.dateFilter ?? (params.fromDate || params.toDate ? "date" : undefined);
     const query: Record<string, QueryValue> = {
       contact_id: params.contactId,
       company_id: params.companyId,
@@ -205,8 +205,8 @@ export class OnePageCrmClient {
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
       date_filter: dateFilter,
-      date_from: params.fromDate,
-      date_to: params.toDate,
+      since: params.fromDate,
+      until: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
