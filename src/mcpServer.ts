@@ -33,7 +33,7 @@ const perPageSchema = z.number().int().min(1).max(100).optional();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for example 2026-05-21");
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
 const actionDateFilterSchema = z.enum(["created_at", "modified_at", "updated_at", "date", "close_date"]);
-const optionalDateSchema = dateSchema.nullish();
+const optionalDateSchema = z.union([dateSchema, z.null()]).optional();
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
 export function createMcpServer(config: AppConfig): McpServer {
@@ -141,9 +141,9 @@ export function createMcpServer(config: AppConfig): McpServer {
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
         dateFilter: actionDateFilterSchema
           .optional()
-          .describe("OnePage CRM date field to filter against. Defaults to date when fromDate or toDate is provided."),
-        fromDate: optionalDateSchema.describe("Only tasks due on or after this date. Sent to OnePage CRM as since."),
-        toDate: optionalDateSchema.describe("Only tasks due on or before this date. Sent to OnePage CRM as until."),
+          .describe("Optional OnePage CRM date field filter. Leave empty when using fromDate or toDate for due-date ranges."),
+        fromDate: optionalDateSchema.describe("Only tasks due on or after this date. Sent to OnePage CRM as date_from."),
+        toDate: optionalDateSchema.describe("Only tasks due on or before this date. Sent to OnePage CRM as date_to."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100."),
         fetchAll: z
