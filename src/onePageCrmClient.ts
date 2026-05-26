@@ -116,30 +116,7 @@ export class OnePageCrmClient {
     }
 
     const response = await this.request("GET", "/actions.json", { query: this.buildActionsQuery(params) });
-    if (!isRecord(response) || !isRecord(response.data) || !Array.isArray(response.data.actions)) {
-      return this.enrichActionsResponse(response);
-    }
-
-    const data = response.data;
-    const actions = data.actions;
-    const filtered = actions.filter((item) => {
-      if (!isRecord(item)) return true;
-      const action = (isRecord(item.action) ? item.action : item) as Record<string, unknown>;
-      const date = stringOrUndefined(action.date);
-      if (!date) return true;
-      if (params.fromDate && date < params.fromDate) return false;
-      if (params.toDate && date > params.toDate) return false;
-      return true;
-    });
-
-    return this.enrichActionsResponse({
-      ...response,
-      data: {
-        ...(data ?? {}),
-        actions: filtered,
-        ...(params.fromDate || params.toDate ? { total_count: filtered.length } : {})
-      }
-    });
+    return this.enrichActionsResponse(response);
   }
 
   private async listAllActions(params: {
@@ -191,9 +168,11 @@ export class OnePageCrmClient {
       page += 1;
     }
 
-    const filtered = actions.filter((item) => {
+    const filtered = actions.filter((item: unknown) => {
       if (!isRecord(item)) return true;
-      const action = (isRecord(item.action) ? item.action : item) as Record<string, unknown>;
+      const action = (isRecord((item as Record<string, unknown>).action)
+        ? (item as Record<string, unknown>).action
+        : item) as Record<string, unknown>;
       const date = stringOrUndefined(action.date);
       if (!date) return true;
       if (params.fromDate && date < params.fromDate) return false;
