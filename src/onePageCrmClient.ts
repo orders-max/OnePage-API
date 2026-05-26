@@ -116,7 +116,30 @@ export class OnePageCrmClient {
     }
 
     const response = await this.request("GET", "/actions.json", { query: this.buildActionsQuery(params) });
-    return this.enrichActionsResponse(response);
+    if (!isRecord(response) || !isRecord(response.data) || !Array.isArray(response.data.actions)) {
+      return this.enrichActionsResponse(response);
+    }
+
+    const data = response.data;
+    const actions = data.actions;
+    const filtered = actions.filter((item) => {
+      if (!isRecord(item)) return true;
+      const action = (isRecord(item.action) ? item.action : item) as Record<string, unknown>;
+      const date = stringOrUndefined(action.date);
+      if (!date) return true;
+      if (params.fromDate && date < params.fromDate) return false;
+      if (params.toDate && date > params.toDate) return false;
+      return true;
+    });
+
+    return this.enrichActionsResponse({
+      ...response,
+      data: {
+        ...(data ?? {}),
+        actions: filtered,
+        ...(params.fromDate || params.toDate ? { total_count: filtered.length } : {})
+      }
+    });
   }
 
   private async listAllActions(params: {
@@ -168,13 +191,23 @@ export class OnePageCrmClient {
       page += 1;
     }
 
+    const filtered = actions.filter((item) => {
+      if (!isRecord(item)) return true;
+      const action = (isRecord(item.action) ? item.action : item) as Record<string, unknown>;
+      const date = stringOrUndefined(action.date);
+      if (!date) return true;
+      if (params.fromDate && date < params.fromDate) return false;
+      if (params.toDate && date > params.toDate) return false;
+      return true;
+    });
+
     const mergedResponse = isRecord(lastResponse)
       ? {
           ...lastResponse,
           data: {
             ...(lastData ?? {}),
-            actions,
-            total_count: totalCount ?? actions.length,
+            actions: filtered,
+            total_count: params.fromDate || params.toDate ? filtered.length : totalCount ?? filtered.length,
             page: firstPage,
             per_page: perPage,
             max_page: maxPage ?? page
@@ -197,16 +230,12 @@ export class OnePageCrmClient {
     page?: number;
     perPage?: number;
   }): Record<string, QueryValue> {
-    const dateFilter = params.dateFilter ?? (params.fromDate || params.toDate ? "date" : undefined);
     const query: Record<string, QueryValue> = {
       contact_id: params.contactId,
       company_id: params.companyId,
       assignee_id: params.assigneeId,
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
-      date_filter: dateFilter,
-      date_from: params.fromDate,
-      date_to: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
@@ -448,16 +477,6 @@ export class OnePageCrmClient {
       }
     }
 
-    // [DEBUG] Log outgoing request details
-    if (path.includes("actions")) {
-      console.log(
-        `[DEBUG] OnePageCRM request URL: ${url.toString()}`
-      );
-      console.log(
-        `[DEBUG] Query params: ${JSON.stringify(options.query ?? {})}`
-      );
-    }
-
     let response: Response;
     try {
       response = await fetch(url, {
@@ -475,15 +494,6 @@ export class OnePageCrmClient {
     }
 
     const payload = await readResponsePayload(response);
-    
-    // [DEBUG] Log response status and total_count
-    if (path.includes("actions")) {
-      const data = isRecord(payload.value) && isRecord(payload.value.data) ? payload.value.data : undefined;
-      console.log(
-        `[DEBUG] Response status: ${response.status}, total_count: ${data?.total_count ?? "N/A"}`
-      );
-    }
-    
     if (!response.ok) {
       throw new OnePageCrmApiError(response.status, friendlyStatusMessage(response.status), payload.message);
     }
