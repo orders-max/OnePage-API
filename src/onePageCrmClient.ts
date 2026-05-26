@@ -205,8 +205,8 @@ export class OnePageCrmClient {
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
       date_filter: dateFilter,
-      since: params.fromDate,
-      until: params.toDate,
+      date_from: params.fromDate,
+      date_to: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
