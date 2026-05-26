@@ -197,16 +197,15 @@ export class OnePageCrmClient {
     page?: number;
     perPage?: number;
   }): Record<string, QueryValue> {
-    const dateFilter = params.dateFilter ?? (params.fromDate || params.toDate ? "date" : undefined);
     const query: Record<string, QueryValue> = {
       contact_id: params.contactId,
       company_id: params.companyId,
       assignee_id: params.assigneeId,
       status: params.status,
       done: params.status === "done" ? true : params.includeDone ? undefined : false,
-      date_filter: dateFilter,
-      since: params.fromDate,
-      until: params.toDate,
+      date_filter: params.dateFilter,
+      date_from: params.fromDate,
+      date_to: params.toDate,
       page: params.page,
       per_page: params.perPage
     };
