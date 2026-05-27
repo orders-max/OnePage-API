@@ -33,7 +33,7 @@ const perPageSchema = z.number().int().min(1).max(100).optional();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for example 2026-05-21");
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
 const actionDateFilterSchema = z.enum(["created_at", "modified_at", "updated_at", "date", "close_date"]);
-const optionalDateSchema = dateSchema.nullish();
+const optionalDateSchema = dateSchema.optional();
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
 export function createMcpServer(config: AppConfig): McpServer {
