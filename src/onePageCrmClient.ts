@@ -228,8 +228,8 @@ export class OnePageCrmClient {
     };
 if (params.fromDate || params.toDate) {
       query.date_filter = params.dateFilter ?? "date";
-      query.date_from = params.fromDate;
-      query.date_to = params.toDate ?? "2099-12-31";
+      query.since = params.fromDate;
+      query.until = params.toDate ?? "2099-12-31";
     }
     return query;
   }
@@ -410,7 +410,7 @@ if (params.fromDate || params.toDate) {
       throw new Error("Provide at least one deal field to update: stage or status.");
     }
 
-    return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
+    return this.request("PUT", `/deals/${encodeURIComponent(dealId)}`, {
       query: { partial: true },
       body
     });
