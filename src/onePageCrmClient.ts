@@ -226,7 +226,11 @@ export class OnePageCrmClient {
       page: params.page,
       per_page: params.perPage
     };
-
+if (params.fromDate || params.toDate) {
+      query.date_filter = params.dateFilter ?? "date";
+      query.date_from = params.fromDate;
+      query.date_to = params.toDate ?? "2099-12-31";
+    }
     return query;
   }
 
