@@ -33,7 +33,7 @@ const perPageSchema = z.number().int().min(1).max(100).optional();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for example 2026-05-21");
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
 const actionDateFilterSchema = z.enum(["created_at", "modified_at", "updated_at", "date", "close_date"]);
-const optionalDateSchema = z.union([dateSchema, z.null()]).optional();
+const optionalDateSchema = dateSchema.optional();
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
 export function createMcpServer(config: AppConfig): McpServer {
@@ -157,7 +157,8 @@ export function createMcpServer(config: AppConfig): McpServer {
         if (input.contactId && input.companyId) {
           throw new Error("Use either contactId or companyId, not both.");
         }
-        const fetchAll = input.fetchAll ?? (!!input.fromDate || !!input.toDate);
+        const shouldFetchAll = !!input.fromDate || !!input.toDate;
+        const fetchAll = input.fetchAll ?? shouldFetchAll;
         const response = await client.listActions({
           contactId: input.contactId,
           companyId: input.companyId,
@@ -169,7 +170,7 @@ export function createMcpServer(config: AppConfig): McpServer {
           toDate: input.toDate ?? undefined,
           page: input.page ?? 1,
           perPage: input.perPage ?? (fetchAll ? 100 : 20),
-          fetchAll: input.fetchAll ?? (!!input.fromDate || !!input.toDate)
+          fetchAll
         });
         return successResult(describeActions(response), structuredActions(response));
       } catch (error) {
