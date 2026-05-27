@@ -410,7 +410,7 @@ if (params.fromDate || params.toDate) {
       throw new Error("Provide at least one deal field to update: stage or status.");
     }
 
-    return this.request("PUT", `/deals/${encodeURIComponent(dealId)}`, {
+    return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
       query: { partial: true },
       body
     });
