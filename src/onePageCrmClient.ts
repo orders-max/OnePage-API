@@ -174,25 +174,33 @@ export class OnePageCrmClient {
         ? (item as Record<string, unknown>).action
         : item) as Record<string, unknown>;
       const date = stringOrUndefined(action.date);
-      if (!date) return true;
+      if (!date) return !(params.fromDate || params.toDate);
       if (params.fromDate && date < params.fromDate) return false;
       if (params.toDate && date > params.toDate) return false;
       return true;
     });
 
+    console.log(`fetchAll result: ${actions.length} total, ${filtered.length} after date filter`);
+
     const mergedResponse = isRecord(lastResponse)
       ? {
           ...lastResponse,
+          actions: filtered,
+          total: filtered.length,
           data: {
             ...(lastData ?? {}),
             actions: filtered,
             total_count: filtered.length,
+            total: filtered.length,
             page: firstPage,
             per_page: perPage,
             max_page: maxPage ?? page
           }
         }
-      : lastResponse;
+      : {
+          actions: filtered,
+          total: filtered.length
+        };
 
     return this.enrichActionsResponse(mergedResponse);
   }
