@@ -39,8 +39,9 @@ export class OnePageCrmClient {
 
   constructor({ endpoint, userId, apiKey }: OnePageCrmCredentials) {
     this.endpoint = endpoint;
-    this.authorizationHeader = `Basic ${Buffer.from(`${userId}:${apiKey}`).toString("base64")}`;
-    console.error(`OnePageCrmClient: userId="${userId}" apiKey="${apiKey.slice(0, 4)}…${apiKey.slice(-4)}" (${apiKey.length} chars)`);
+    const credential = `${userId}:${apiKey}`;
+    this.authorizationHeader = `Basic ${Buffer.from(credential).toString("base64")}`;
+    console.error(`OnePageCrmClient: endpoint="${endpoint}" userId="${userId}" apiKey="${apiKey.slice(0, 4)}…${apiKey.slice(-4)}" (${apiKey.length} chars) credential="${credential.slice(0, 12)}…" authHeader="Basic ${Buffer.from(credential).toString("base64").slice(0, 20)}…"`);
   }
 
   async testConnection(): Promise<unknown> {
