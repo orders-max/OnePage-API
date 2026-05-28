@@ -111,7 +111,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required"));
+        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
         const response = await client.createContact(input);
         return successResult(describeContact(response), response);
       } catch (error) {
@@ -206,7 +206,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required"));
+        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
         const response = await client.createAction(input);
         return successResult(describeCreatedAction(response), response);
       } catch (error) {
@@ -257,7 +257,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required"));
+        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
         const response = await client.addNote(input);
         return successResult(describeNote(response), structuredCreatedNote(response));
       } catch (error) {
@@ -328,7 +328,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required"));
+        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
         const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
       } catch (error) {
@@ -420,7 +420,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required"));
+        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
         const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
       } catch (error) {
