@@ -472,6 +472,8 @@ export class OnePageCrmClient {
       }
     }
 
+    console.log("OnePageCRM API request:", url.toString());
+
     let response: Response;
     try {
       response = await fetch(url, {
