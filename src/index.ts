@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, type UserCredentials } from "./config.js";
 import { createMcpServer } from "./mcpServer.js";
 
 if (process.argv.includes("--stdio")) process.env.MCP_TRANSPORT = "stdio";
@@ -38,7 +38,7 @@ async function runHttp(): Promise<void> {
   app.use(["/mcp", "/sse", "/messages"], requireBearerToken);
 
   app.post("/mcp", async (req, res) => {
-    const server = createMcpServer(config);
+    const server = createMcpServer(config, res.locals.userCreds as UserCredentials | undefined);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
     res.on("close", () => {
@@ -68,7 +68,7 @@ async function runHttp(): Promise<void> {
   const sseTransports = new Map<string, { transport: SSEServerTransport; server: ReturnType<typeof createMcpServer> }>();
 
   app.get("/sse", async (_req, res) => {
-    const server = createMcpServer(config);
+    const server = createMcpServer(config, res.locals.userCreds as UserCredentials | undefined);
     const transport = new SSEServerTransport("/messages", res);
     sseTransports.set(transport.sessionId, { transport, server });
 
@@ -114,12 +114,23 @@ async function runHttp(): Promise<void> {
 }
 
 function requireBearerToken(req: Request, res: Response, next: NextFunction): void {
-  if (!config.mcpBearerToken) {
+  const authHeader = req.header("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+  // Multi-user mode: token must be a key in userMap.
+  if (config.userMap.size > 0) {
+    const userCreds = config.userMap.get(token);
+    if (!userCreds) {
+      res.status(401).json({ error: "Unauthorized." });
+      return;
+    }
+    res.locals.userCreds = userCreds;
     next();
     return;
   }
 
-  if (req.header("authorization") !== `Bearer ${config.mcpBearerToken}`) {
+  // Single-user mode: validate against MCP_BEARER_TOKEN (if set).
+  if (config.mcpBearerToken && authHeader !== `Bearer ${config.mcpBearerToken}`) {
     res.status(401).json({ error: "Unauthorized." });
     return;
   }

@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { AppConfig } from "./config.js";
+import type { AppConfig, UserCredentials } from "./config.js";
 import {
   describeActions,
   describeContact,
@@ -34,8 +34,12 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for 
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
-export function createMcpServer(config: AppConfig): McpServer {
-  const client = new OnePageCrmClient(config);
+export function createMcpServer(config: AppConfig, userCreds?: UserCredentials): McpServer {
+  const client = new OnePageCrmClient({
+    endpoint: config.onePageCrmEndpoint,
+    userId: userCreds?.userId ?? config.onePageCrmUserId,
+    apiKey: userCreds?.apiKey ?? config.onePageCrmApiKey
+  });
   const server = new McpServer({
     name: "onepagecrm-mcp-server",
     version: "0.1.0"

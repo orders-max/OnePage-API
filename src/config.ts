@@ -1,5 +1,10 @@
 import "dotenv/config";
 
+export type UserCredentials = {
+  userId: string;
+  apiKey: string;
+};
+
 export type AppConfig = {
   onePageCrmEndpoint: string;
   onePageCrmUserId: string;
@@ -7,6 +12,7 @@ export type AppConfig = {
   transport: "http" | "stdio";
   port: number;
   mcpBearerToken?: string;
+  userMap: Map<string, UserCredentials>;
 };
 
 function requiredEnv(name: string): string {
@@ -15,6 +21,10 @@ function requiredEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function optionalEnv(name: string): string {
+  return process.env[name]?.trim() ?? "";
 }
 
 function normalizeEndpoint(endpoint: string): string {
@@ -50,13 +60,37 @@ function readPort(): number {
   return port;
 }
 
+function parseUserMap(raw: string | undefined): Map<string, UserCredentials> {
+  if (!raw?.trim()) return new Map();
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const map = new Map<string, UserCredentials>();
+    for (const [token, value] of Object.entries(parsed)) {
+      if (typeof value === "object" && value !== null) {
+        const v = value as Record<string, unknown>;
+        if (typeof v.userId === "string" && v.userId.trim() && typeof v.apiKey === "string" && v.apiKey.trim()) {
+          map.set(token, { userId: v.userId.trim(), apiKey: v.apiKey.trim() });
+        }
+      }
+    }
+    return map;
+  } catch {
+    throw new Error("USER_MAP must be a valid JSON object mapping tokens to {userId, apiKey}.");
+  }
+}
+
 export function loadConfig(): AppConfig {
+  const userMap = parseUserMap(process.env.USER_MAP);
+  const hasUserMap = userMap.size > 0;
+
   return {
     onePageCrmEndpoint: normalizeEndpoint(requiredEnv("ONEPAGECRM_ENDPOINT")),
-    onePageCrmUserId: requiredEnv("ONEPAGECRM_USER_ID"),
-    onePageCrmApiKey: requiredEnv("ONEPAGECRM_API_KEY"),
+    // When USER_MAP is set these become optional fallbacks; otherwise required.
+    onePageCrmUserId: hasUserMap ? optionalEnv("ONEPAGECRM_USER_ID") : requiredEnv("ONEPAGECRM_USER_ID"),
+    onePageCrmApiKey: hasUserMap ? optionalEnv("ONEPAGECRM_API_KEY") : requiredEnv("ONEPAGECRM_API_KEY"),
     transport: readTransport(),
     port: readPort(),
-    mcpBearerToken: process.env.MCP_BEARER_TOKEN?.trim() || undefined
+    mcpBearerToken: process.env.MCP_BEARER_TOKEN?.trim() || undefined,
+    userMap
   };
 }

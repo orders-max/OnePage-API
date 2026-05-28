@@ -1,5 +1,3 @@
-import type { AppConfig } from "./config.js";
-
 type QueryValue = string | number | boolean | undefined | null;
 type RawContact = Record<string, unknown> & {
   id?: string;
@@ -28,16 +26,20 @@ export class OnePageCrmApiError extends Error {
   }
 }
 
+export type OnePageCrmCredentials = {
+  endpoint: string;
+  userId: string;
+  apiKey: string;
+};
+
 export class OnePageCrmClient {
   private readonly endpoint: string;
   private readonly authorizationHeader: string;
   private userCache: Map<string, Record<string, unknown>> | null = null;
 
-  constructor(config: AppConfig) {
-    this.endpoint = config.onePageCrmEndpoint;
-    this.authorizationHeader = `Basic ${Buffer.from(
-      `${config.onePageCrmUserId}:${config.onePageCrmApiKey}`
-    ).toString("base64")}`;
+  constructor({ endpoint, userId, apiKey }: OnePageCrmCredentials) {
+    this.endpoint = endpoint;
+    this.authorizationHeader = `Basic ${Buffer.from(`${userId}:${apiKey}`).toString("base64")}`;
   }
 
   async testConnection(): Promise<unknown> {

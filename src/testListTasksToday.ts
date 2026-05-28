@@ -55,7 +55,12 @@ async function callClientListTasks(args: ClientListTaskArgs): Promise<unknown> {
     import("./config.js"),
     import("./onePageCrmClient.js")
   ]);
-  const client = new OnePageCrmClient(loadConfig());
+  const config = loadConfig();
+  const client = new OnePageCrmClient({
+    endpoint: config.onePageCrmEndpoint,
+    userId: config.onePageCrmUserId,
+    apiKey: config.onePageCrmApiKey
+  });
   return client.listActions(args);
 }
 
