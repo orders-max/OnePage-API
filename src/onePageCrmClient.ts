@@ -133,39 +133,52 @@ export class OnePageCrmClient {
   }): Promise<unknown> {
     const perPage = params.perPage ?? 100;
     const firstPage = params.page ?? 1;
-    let page = firstPage;
-    let lastResponse: unknown;
-    let lastData: Record<string, unknown> | undefined;
-    let totalCount: number | undefined;
-    let maxPage: number | undefined;
-    const actions: unknown[] = [];
 
-    for (let requestCount = 0; requestCount < 1000; requestCount += 1) {
-      const response = await this.request("GET", "/actions.json", {
-        query: this.buildActionsQuery({ ...params, page, perPage })
-      });
+    // Page 1 tells us the total so we can fire remaining pages in parallel.
+    const firstResponse = await this.request("GET", "/actions.json", {
+      query: this.buildActionsQuery({ ...params, page: firstPage, perPage })
+    });
+    const firstData = isRecord(firstResponse) && isRecord(firstResponse.data) ? firstResponse.data : undefined;
+    const firstPageActions: unknown[] = Array.isArray(firstData?.actions) ? firstData.actions : [];
+    const totalCount = numberOrUndefined(firstData?.total_count);
+    const maxPage = numberOrUndefined(firstData?.max_page);
+
+    // Derive the last page number from whichever hint the API provides.
+    let lastPage: number;
+    if (maxPage !== undefined) {
+      lastPage = maxPage;
+    } else if (totalCount !== undefined) {
+      lastPage = Math.ceil(totalCount / perPage);
+    } else {
+      // No pagination metadata — page 1 is the only page.
+      lastPage = firstPage;
+    }
+
+    // Fire all remaining pages simultaneously.
+    const remainingPageNumbers: number[] = [];
+    for (let p = firstPage + 1; p <= lastPage; p++) {
+      remainingPageNumbers.push(p);
+    }
+
+    const remainingResponses = await Promise.all(
+      remainingPageNumbers.map(p =>
+        this.request("GET", "/actions.json", {
+          query: this.buildActionsQuery({ ...params, page: p, perPage })
+        })
+      )
+    );
+
+    // Merge results in page order.
+    const actions: unknown[] = [...firstPageActions];
+    let lastResponse: unknown = firstResponse;
+    let lastData: Record<string, unknown> | undefined = firstData;
+
+    for (const response of remainingResponses) {
       const data = isRecord(response) && isRecord(response.data) ? response.data : undefined;
       const pageActions = Array.isArray(data?.actions) ? data.actions : [];
-
+      actions.push(...pageActions);
       lastResponse = response;
       lastData = data;
-      actions.push(...pageActions);
-      totalCount = numberOrUndefined(data?.total_count) ?? totalCount;
-      maxPage = numberOrUndefined(data?.max_page) ?? maxPage;
-
-      if (maxPage !== undefined && page >= maxPage) {
-        break;
-      }
-      if (totalCount !== undefined && actions.length >= totalCount) {
-        break;
-      }
-      if (pageActions.length === 0) {
-        break;
-      }
-      if (maxPage === undefined && totalCount === undefined && pageActions.length < perPage) {
-        break;
-      }
-      page += 1;
     }
 
     const filtered = actions.filter((item: unknown) => {
@@ -180,8 +193,6 @@ export class OnePageCrmClient {
       return true;
     });
 
-    console.log(`fetchAll result: ${actions.length} total, ${filtered.length} after date filter`);
-
     const mergedResponse = isRecord(lastResponse)
       ? {
           ...lastResponse,
@@ -194,7 +205,7 @@ export class OnePageCrmClient {
             total: filtered.length,
             page: firstPage,
             per_page: perPage,
-            max_page: maxPage ?? page
+            max_page: maxPage ?? lastPage
           }
         }
       : {
