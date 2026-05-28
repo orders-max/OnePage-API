@@ -139,7 +139,7 @@ export function createMcpServer(config: AppConfig): McpServer {
           .describe("Only show tasks assigned to this OnePage CRM user ID."),
         status: actionStatusSchema.optional().describe("Optional task status filter."),
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
-        dueToday: z.boolean().optional().describe("Set true to return only tasks due today. Fetches all pages and filters client-side by today's date."),
+        dueToday: z.boolean().optional().describe("Set true to return tasks due today or overdue (due date on or before today). Fetches all pages and filters client-side."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100."),
         fetchAll: z

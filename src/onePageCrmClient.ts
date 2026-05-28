@@ -183,7 +183,8 @@ export class OnePageCrmClient {
       const action = (isRecord((item as Record<string, unknown>).action)
         ? (item as Record<string, unknown>).action
         : item) as Record<string, unknown>;
-      return stringOrUndefined(action.date) === params.dueDate;
+      const date = stringOrUndefined(action.date);
+      return date !== undefined && date <= params.dueDate;
     });
 
     const mergedResponse = isRecord(lastResponse)
