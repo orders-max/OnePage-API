@@ -1,6 +1,3 @@
-import { readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AppConfig } from "./config.js";
@@ -35,59 +32,7 @@ const pageSchema = z.number().int().min(1).max(10000).optional();
 const perPageSchema = z.number().int().min(1).max(100).optional();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD, for example 2026-05-21");
 const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queued", "queued_with_date", "done"]);
-const actionDateFilterSchema = z.enum(["created_at", "modified_at", "updated_at", "date", "close_date"]);
-const optionalDateSchema = dateSchema.optional();
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
-
-const IDENTITY_FILE = join(homedir(), ".onepagecrm-mcp-identity.json");
-
-function loadSavedUserId(): string | null {
-  if (process.env.ONEPAGECRM_CURRENT_USER_ID?.trim()) {
-    return process.env.ONEPAGECRM_CURRENT_USER_ID.trim();
-  }
-  try {
-    const data = JSON.parse(readFileSync(IDENTITY_FILE, "utf-8")) as { userId?: unknown };
-    return typeof data.userId === "string" && data.userId.trim() ? data.userId.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistUserId(userId: string): void {
-  try {
-    writeFileSync(IDENTITY_FILE, JSON.stringify({ userId }), "utf-8");
-  } catch {
-    // Non-fatal — in-memory identity still works for this session.
-  }
-}
-
-function noIdentityPrompt(teamList: string) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text" as const,
-        text: `Identity not set. I need to know which team member you are before making any changes.\n\n${teamList}\n\nCall identify_me with your user ID to proceed.`
-      }
-    ]
-  };
-}
-
-function extractUserList(response: unknown): Array<{ id: string; firstName: string; lastName: string }> {
-  const record = typeof response === "object" && response !== null ? (response as Record<string, unknown>) : {};
-  const data = record.data ?? response;
-  const arr = Array.isArray(data) ? data : (typeof data === "object" && data !== null && Array.isArray((data as Record<string, unknown>).users)) ? (data as Record<string, unknown>).users as unknown[] : [];
-  return (arr as unknown[]).flatMap((item) => {
-    const u = (typeof item === "object" && item !== null && "user" in (item as Record<string, unknown>)) ? (item as Record<string, unknown>).user : item;
-    if (typeof u !== "object" || u === null) return [];
-    const user = u as Record<string, unknown>;
-    const id = typeof user.id === "string" ? user.id.trim() : undefined;
-    if (!id) return [];
-    return [{ id, firstName: typeof user.first_name === "string" ? user.first_name : "", lastName: typeof user.last_name === "string" ? user.last_name : "" }];
-  });
-}
-
-let currentUserId: string | null = loadSavedUserId();
 
 export function createMcpServer(config: AppConfig): McpServer {
   const client = new OnePageCrmClient(config);
@@ -153,6 +98,7 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Create Contact",
       description: "Create a new contact in OnePage CRM.",
       inputSchema: {
+        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         firstName: z.string().trim().min(1).max(100).describe("Contact's first name."),
         lastName: z.string().trim().min(1).max(100).optional().describe("Contact's last name."),
         companyName: z.string().trim().min(1).max(100).optional().describe("Company or organization name."),
@@ -165,7 +111,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
+        if (!input.userId) return errorResult(new Error("userId is required"));
         const response = await client.createContact(input);
         return successResult(describeContact(response), response);
       } catch (error) {
@@ -204,7 +150,6 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
         if (input.contactId && input.companyId) {
           throw new Error("Use either contactId or companyId, not both.");
         }
@@ -240,6 +185,7 @@ export function createMcpServer(config: AppConfig): McpServer {
       description:
         "Use this to create a follow-up / next action task in OnePage CRM. A contact ID is required because OnePage CRM actions belong to contacts.",
       inputSchema: {
+        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         contactId: idSchema.describe("The contact ID to link this task to."),
         text: z.string().trim().min(1).max(140).describe("Task text. Maximum 140 characters."),
         dueDate: dateSchema.optional().describe("Optional due date in YYYY-MM-DD format."),
@@ -260,7 +206,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
+        if (!input.userId) return errorResult(new Error("userId is required"));
         const response = await client.createAction(input);
         return successResult(describeCreatedAction(response), response);
       } catch (error) {
@@ -301,6 +247,7 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Add Note",
       description: "Use this to add a note to a OnePage CRM contact.",
       inputSchema: {
+        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         contactId: idSchema.describe("The contact ID to add the note to."),
         text: z.string().trim().min(1).max(7168).describe("Note text. Maximum 7168 characters."),
         date: dateSchema.optional().describe("Optional note date in YYYY-MM-DD format."),
@@ -310,7 +257,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
+        if (!input.userId) return errorResult(new Error("userId is required"));
         const response = await client.addNote(input);
         return successResult(describeNote(response), structuredCreatedNote(response));
       } catch (error) {
@@ -373,6 +320,7 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Update Deal",
       description: "Update a OnePage CRM deal stage or status. Status open maps to OnePage CRM pending deals.",
       inputSchema: {
+        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         dealId: idSchema.describe("The OnePage CRM deal ID."),
         stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost.")
@@ -380,7 +328,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
+        if (!input.userId) return errorResult(new Error("userId is required"));
         const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
       } catch (error) {
@@ -466,44 +414,15 @@ export function createMcpServer(config: AppConfig): McpServer {
       description:
         "Use this to mark a OnePage CRM task / action as complete. The server first reads the task, then sends OnePage CRM the documented done=true update.",
       inputSchema: {
+        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         taskId: idSchema.describe("The OnePage CRM action/task ID.")
       }
     },
     async (input) => {
       try {
-        if (!currentUserId) return noIdentityPrompt(describeUsers(await client.listUsers()));
+        if (!input.userId) return errorResult(new Error("userId is required"));
         const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  server.registerTool(
-    "identify_me",
-    {
-      title: "Identify Me",
-      description:
-        "Tell the server which OnePage CRM user you are. Required before any write operations. Call list_users first if you need to look up your ID.",
-      inputSchema: {
-        userId: idSchema.describe("Your OnePage CRM user ID.")
-      }
-    },
-    async (input) => {
-      try {
-        const usersResponse = await client.listUsers();
-        const users = extractUserList(usersResponse);
-        const match = users.find((u) => u.id === input.userId);
-        if (!match) {
-          return errorResult(
-            new Error(`User ID "${input.userId}" was not found in the team. Call list_users to see valid IDs.`)
-          );
-        }
-        currentUserId = input.userId;
-        persistUserId(input.userId);
-        const name = [match.firstName, match.lastName].filter(Boolean).join(" ").trim() || input.userId;
-        return successResult(`Identity saved. You are ${name} (${input.userId}).`, { userId: input.userId, name });
       } catch (error) {
         return errorResult(error);
       }
