@@ -226,15 +226,6 @@ export class OnePageCrmClient {
       page: params.page,
       per_page: params.perPage
     };
-    if (params.fromDate || params.toDate) {
-      query.date_filter = params.dateFilter ?? "date";
-      query.since = params.fromDate
-        ? Math.floor(new Date(params.fromDate).getTime() / 1000)
-        : undefined;
-      query.until = params.toDate
-        ? Math.floor(new Date(params.toDate + "T23:59:59").getTime() / 1000)
-        : undefined;
-    }
     return query;
   }
 
@@ -471,8 +462,6 @@ export class OnePageCrmClient {
         url.searchParams.set(key, String(value));
       }
     }
-
-    console.log("OnePageCRM API request:", url.toString());
 
     let response: Response;
     try {
