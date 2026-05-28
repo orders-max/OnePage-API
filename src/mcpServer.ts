@@ -98,7 +98,6 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Create Contact",
       description: "Create a new contact in OnePage CRM.",
       inputSchema: {
-        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         firstName: z.string().trim().min(1).max(100).describe("Contact's first name."),
         lastName: z.string().trim().min(1).max(100).optional().describe("Contact's last name."),
         companyName: z.string().trim().min(1).max(100).optional().describe("Company or organization name."),
@@ -111,8 +110,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
-        const response = await client.createContact(input);
+const response = await client.createContact(input);
         return successResult(describeContact(response), response);
       } catch (error) {
         return errorResult(error);
@@ -185,7 +183,6 @@ export function createMcpServer(config: AppConfig): McpServer {
       description:
         "Use this to create a follow-up / next action task in OnePage CRM. A contact ID is required because OnePage CRM actions belong to contacts.",
       inputSchema: {
-        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         contactId: idSchema.describe("The contact ID to link this task to."),
         text: z.string().trim().min(1).max(140).describe("Task text. Maximum 140 characters."),
         dueDate: dateSchema.optional().describe("Optional due date in YYYY-MM-DD format."),
@@ -206,8 +203,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
-        const response = await client.createAction(input);
+const response = await client.createAction(input);
         return successResult(describeCreatedAction(response), response);
       } catch (error) {
         return errorResult(error);
@@ -247,7 +243,6 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Add Note",
       description: "Use this to add a note to a OnePage CRM contact.",
       inputSchema: {
-        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         contactId: idSchema.describe("The contact ID to add the note to."),
         text: z.string().trim().min(1).max(7168).describe("Note text. Maximum 7168 characters."),
         date: dateSchema.optional().describe("Optional note date in YYYY-MM-DD format."),
@@ -257,8 +252,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
-        const response = await client.addNote(input);
+const response = await client.addNote(input);
         return successResult(describeNote(response), structuredCreatedNote(response));
       } catch (error) {
         return errorResult(error);
@@ -320,7 +314,6 @@ export function createMcpServer(config: AppConfig): McpServer {
       title: "Update Deal",
       description: "Update a OnePage CRM deal stage or status. Status open maps to OnePage CRM pending deals.",
       inputSchema: {
-        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         dealId: idSchema.describe("The OnePage CRM deal ID."),
         stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost.")
@@ -328,8 +321,7 @@ export function createMcpServer(config: AppConfig): McpServer {
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
-        const response = await client.updateDeal(input);
+const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
       } catch (error) {
         return errorResult(error);
@@ -414,14 +406,12 @@ export function createMcpServer(config: AppConfig): McpServer {
       description:
         "Use this to mark a OnePage CRM task / action as complete. The server first reads the task, then sends OnePage CRM the documented done=true update.",
       inputSchema: {
-        userId: idSchema.optional().describe("Your OnePage CRM user ID. Required to perform write operations."),
         taskId: idSchema.describe("The OnePage CRM action/task ID.")
       }
     },
     async (input) => {
       try {
-        if (!input.userId) return errorResult(new Error("userId is required. Call list_users to see the team, ask the user which one they are, save their OnePage CRM user ID to memory, then retry this call with userId set."));
-        const response = await client.markActionDone(input.taskId);
+const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
       } catch (error) {
         return errorResult(error);
