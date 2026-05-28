@@ -139,11 +139,7 @@ export function createMcpServer(config: AppConfig): McpServer {
           .describe("Only show tasks assigned to this OnePage CRM user ID."),
         status: actionStatusSchema.optional().describe("Optional task status filter."),
         includeDone: z.boolean().optional().describe("Set true to include completed tasks."),
-        dateFilter: actionDateFilterSchema
-          .optional()
-          .describe("Optional OnePage CRM date field filter. Defaults to date when using fromDate or toDate."),
-        fromDate: optionalDateSchema.describe("Only tasks due on or after this date. Sent to OnePage CRM as since."),
-        toDate: optionalDateSchema.describe("Only tasks due on or before this date. Sent to OnePage CRM as until. When omitted, no upper date limit is applied."),
+        dueToday: z.boolean().optional().describe("Set true to return only tasks due today. Fetches all pages and filters client-side by today's date."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100."),
         fetchAll: z
@@ -157,17 +153,20 @@ export function createMcpServer(config: AppConfig): McpServer {
         if (input.contactId && input.companyId) {
           throw new Error("Use either contactId or companyId, not both.");
         }
-        const shouldFetchAll = !!input.fromDate || !!input.toDate;
-        const fetchAll = input.fetchAll ?? shouldFetchAll;
+        const fetchAll = input.fetchAll ?? input.dueToday ?? false;
+        const dueDate = input.dueToday
+          ? (() => {
+              const d = new Date();
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            })()
+          : undefined;
         const response = await client.listActions({
           contactId: input.contactId,
           companyId: input.companyId,
           assigneeId: input.assigneeId,
           status: input.status,
           includeDone: input.includeDone,
-          dateFilter: input.dateFilter ?? undefined,
-          fromDate: input.fromDate ?? undefined,
-          toDate: input.toDate ?? undefined,
+          dueDate,
           page: input.page ?? 1,
           perPage: input.perPage ?? (fetchAll ? 100 : 20),
           fetchAll

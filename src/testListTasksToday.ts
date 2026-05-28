@@ -1,25 +1,36 @@
-type ListTaskArgs = {
+type ClientListTaskArgs = {
   assigneeId: string;
-  fromDate: string;
-  toDate: string;
+  dueDate: string;
+  fetchAll: true;
+  perPage: 100;
+};
+
+type McpListTaskArgs = {
+  assigneeId: string;
+  dueToday: true;
   fetchAll: true;
   perPage: 100;
 };
 
 const taskDate = process.env.TEST_TASK_DATE?.trim() || todayInTimeZone(process.env.TEST_TIME_ZONE || "America/Regina");
 const assigneeId = process.env.TEST_ONEPAGECRM_ASSIGNEE_ID?.trim() || "64356f39cbd21b3445c08b05";
-const args: ListTaskArgs = {
+const clientArgs: ClientListTaskArgs = {
   assigneeId,
-  fromDate: taskDate,
-  toDate: taskDate,
+  dueDate: taskDate,
+  fetchAll: true,
+  perPage: 100
+};
+const mcpArgs: McpListTaskArgs = {
+  assigneeId,
+  dueToday: true,
   fetchAll: true,
   perPage: 100
 };
 
 try {
   const response = process.env.MCP_TEST_SERVER_URL
-    ? await callMcpListTasks(process.env.MCP_TEST_SERVER_URL, args)
-    : await callClientListTasks(args);
+    ? await callMcpListTasks(process.env.MCP_TEST_SERVER_URL, mcpArgs)
+    : await callClientListTasks(clientArgs);
   const actions = extractActions(response);
   const dates = actions.map(actionDate);
   const wrongDates = dates.filter((date) => date !== taskDate);
@@ -39,7 +50,7 @@ try {
   process.exitCode = 1;
 }
 
-async function callClientListTasks(args: ListTaskArgs): Promise<unknown> {
+async function callClientListTasks(args: ClientListTaskArgs): Promise<unknown> {
   const [{ loadConfig }, { OnePageCrmClient }] = await Promise.all([
     import("./config.js"),
     import("./onePageCrmClient.js")
@@ -48,7 +59,7 @@ async function callClientListTasks(args: ListTaskArgs): Promise<unknown> {
   return client.listActions(args);
 }
 
-async function callMcpListTasks(serverUrl: string, args: ListTaskArgs): Promise<unknown> {
+async function callMcpListTasks(serverUrl: string, args: McpListTaskArgs): Promise<unknown> {
   const response = await fetch(serverUrl, {
     method: "POST",
     headers: {

@@ -104,9 +104,7 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
-    fromDate?: string;
-    toDate?: string;
+    dueDate?: string;
     page?: number;
     perPage?: number;
     fetchAll?: boolean;
@@ -125,9 +123,7 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
-    fromDate?: string;
-    toDate?: string;
+    dueDate?: string;
     page?: number;
     perPage?: number;
   }): Promise<unknown> {
@@ -182,15 +178,12 @@ export class OnePageCrmClient {
     }
 
     const filtered = actions.filter((item: unknown) => {
+      if (!params.dueDate) return true;
       if (!isRecord(item)) return true;
       const action = (isRecord((item as Record<string, unknown>).action)
         ? (item as Record<string, unknown>).action
         : item) as Record<string, unknown>;
-      const date = stringOrUndefined(action.date);
-      if (!date) return !(params.fromDate || params.toDate);
-      if (params.fromDate && date < params.fromDate) return false;
-      if (params.toDate && date > params.toDate) return false;
-      return true;
+      return stringOrUndefined(action.date) === params.dueDate;
     });
 
     const mergedResponse = isRecord(lastResponse)
@@ -222,9 +215,6 @@ export class OnePageCrmClient {
     assigneeId?: string;
     status?: string;
     includeDone?: boolean;
-    dateFilter?: "created_at" | "modified_at" | "updated_at" | "date" | "close_date";
-    fromDate?: string;
-    toDate?: string;
     page?: number;
     perPage?: number;
   }): Record<string, QueryValue> {
