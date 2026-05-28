@@ -154,17 +154,19 @@ export class OnePageCrmClient {
       lastPage = firstPage;
     }
 
-    // Fire all remaining pages simultaneously.
+    // Fire remaining pages with a 300ms stagger to avoid rate limiting.
     const remainingPageNumbers: number[] = [];
     for (let p = firstPage + 1; p <= lastPage; p++) {
       remainingPageNumbers.push(p);
     }
 
     const remainingResponses = await Promise.all(
-      remainingPageNumbers.map(p =>
-        this.request("GET", "/actions.json", {
-          query: this.buildActionsQuery({ ...params, page: p, perPage })
-        })
+      remainingPageNumbers.map((p, i) =>
+        new Promise<unknown>(resolve => setTimeout(resolve, i * 300)).then(() =>
+          this.request("GET", "/actions.json", {
+            query: this.buildActionsQuery({ ...params, page: p, perPage })
+          })
+        )
       )
     );
 
