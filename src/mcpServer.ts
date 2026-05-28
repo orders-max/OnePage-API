@@ -35,6 +35,7 @@ const actionStatusSchema = z.enum(["asap", "date", "date_time", "waiting", "queu
 const dealStatusSchema = z.enum(["open", "won", "lost"]);
 
 export function createMcpServer(config: AppConfig, userCreds?: UserCredentials): McpServer {
+  console.error(`createMcpServer: userCreds=${userCreds ? `userId="${userCreds.userId}"` : "none (falling back to config)"}`);
   const client = new OnePageCrmClient({
     endpoint: config.onePageCrmEndpoint,
     userId: userCreds?.userId ?? config.onePageCrmUserId,

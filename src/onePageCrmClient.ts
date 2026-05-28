@@ -40,6 +40,7 @@ export class OnePageCrmClient {
   constructor({ endpoint, userId, apiKey }: OnePageCrmCredentials) {
     this.endpoint = endpoint;
     this.authorizationHeader = `Basic ${Buffer.from(`${userId}:${apiKey}`).toString("base64")}`;
+    console.error(`OnePageCrmClient: userId="${userId}" apiKey="${apiKey.slice(0, 4)}…${apiKey.slice(-4)}" (${apiKey.length} chars)`);
   }
 
   async testConnection(): Promise<unknown> {
