@@ -143,7 +143,7 @@ export function createMcpServer(config: AppConfig): McpServer {
           .optional()
           .describe("Optional OnePage CRM date field filter. Defaults to date when using fromDate or toDate."),
         fromDate: optionalDateSchema.describe("Only tasks due on or after this date. Sent to OnePage CRM as since."),
-        toDate: dateSchema.optional().describe("Only tasks due on or before this date. Sent to OnePage CRM as until."),
+        toDate: optionalDateSchema.describe("Only tasks due on or before this date. Sent to OnePage CRM as until. When omitted, no upper date limit is applied."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of tasks to return. Maximum 100."),
         fetchAll: z
