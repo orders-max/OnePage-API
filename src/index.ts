@@ -10,6 +10,12 @@ if (process.argv.includes("--http")) process.env.MCP_TRANSPORT = "http";
 
 const config = loadConfig();
 
+if (config.userMap.size > 0) {
+  console.error(`USER_MAP loaded: ${config.userMap.size} user(s) — tokens: ${[...config.userMap.keys()].join(", ")}`);
+} else {
+  console.error("USER_MAP not set — running in single-user mode.");
+}
+
 if (config.transport === "stdio") {
   await runStdio();
 } else {
