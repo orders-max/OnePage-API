@@ -226,10 +226,10 @@ export class OnePageCrmClient {
       page: params.page,
       per_page: params.perPage
     };
-if (params.fromDate || params.toDate) {
+    if (params.fromDate || params.toDate) {
       query.date_filter = params.dateFilter ?? "date";
       query.since = params.fromDate;
-      query.until = params.toDate ?? "2099-12-31";
+      query.until = params.toDate;
     }
     return query;
   }
