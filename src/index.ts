@@ -115,7 +115,9 @@ async function runHttp(): Promise<void> {
 
 function requireBearerToken(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.header("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const queryToken = typeof req.query.token === "string" ? req.query.token : "";
+  const token = headerToken || queryToken;
 
   // Multi-user mode: token must be a key in userMap.
   if (config.userMap.size > 0) {
@@ -130,7 +132,7 @@ function requireBearerToken(req: Request, res: Response, next: NextFunction): vo
   }
 
   // Single-user mode: validate against MCP_BEARER_TOKEN (if set).
-  if (config.mcpBearerToken && authHeader !== `Bearer ${config.mcpBearerToken}`) {
+  if (config.mcpBearerToken && token !== config.mcpBearerToken) {
     res.status(401).json({ error: "Unauthorized." });
     return;
   }
