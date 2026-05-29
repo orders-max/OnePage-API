@@ -421,7 +421,7 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status) ?? "pending",
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      description: params.description
+      body: params.description
     });
     return this.request("POST", "/deals", { body });
   }
@@ -443,7 +443,7 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status),
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      description: params.description
+      body: params.description
     });
 
     if (Object.keys(body).length === 0) {

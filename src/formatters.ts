@@ -260,12 +260,14 @@ function formatDealLine(deal: RecordValue): string {
   const status = normalizeDealStatus(stringOrUndefined(deal.status));
   const stage = numberOrUndefined(deal.stage);
   const closeDate = stringOrUndefined(deal.expected_close_date) ?? stringOrUndefined(deal.close_date);
+  const description = stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description);
   return [
     name,
     value !== undefined ? `value: ${value}` : undefined,
     stage !== undefined ? `stage: ${stage}` : undefined,
     status ? `status: ${status}` : undefined,
     closeDate ? `close: ${closeDate}` : undefined,
+    description ? `description: ${description}` : undefined,
     id ? `ID: ${id}` : undefined
   ]
     .filter(Boolean)
@@ -403,7 +405,7 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     owner_id: stringOrUndefined(deal.owner_id),
     owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
-    description: stringOrUndefined(deal.description),
+    description: stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description),
     created_at: stringOrUndefined(deal.created_at)
   };
 }
