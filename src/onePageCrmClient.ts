@@ -1,5 +1,3 @@
-import { PDFParse } from "pdf-parse";
-
 type QueryValue = string | number | boolean | undefined | null;
 type RawContact = Record<string, unknown> & {
   id?: string;
@@ -560,77 +558,6 @@ export class OnePageCrmClient {
       query: { partial: true },
       body
     });
-  }
-
-  async listContactAttachments(contactId: string): Promise<unknown> {
-    return this.request("GET", `/contacts/${encodeURIComponent(contactId)}/attachments`);
-  }
-
-  async listDealAttachments(dealId: string): Promise<unknown> {
-    // Attachments in OnePageCRM are stored at the contact level, not the deal level.
-    // Look up the deal to get its linked contactId, then fetch contact attachments.
-    const dealResponse = await this.getDeal(dealId);
-    const data = isRecord(dealResponse) && isRecord(dealResponse.data) ? dealResponse.data : undefined;
-    const deal = isRecord(data?.deal) ? data.deal : undefined;
-    const contactId = stringOrUndefined(deal?.contact_id);
-    if (!contactId) {
-      throw new Error("Could not determine contact ID from deal — cannot fetch attachments.");
-    }
-    return this.listContactAttachments(contactId);
-  }
-
-  async readAttachment(attachmentId: string): Promise<unknown> {
-    const metaResponse = await this.request("GET", `/attachments/${encodeURIComponent(attachmentId)}`);
-    const data = isRecord(metaResponse) && isRecord(metaResponse.data) ? metaResponse.data : undefined;
-    const attachment = isRecord(data?.attachment) ? data.attachment : undefined;
-
-    const downloadUrl =
-      stringOrUndefined(attachment?.url) ??
-      stringOrUndefined(attachment?.download_url) ??
-      stringOrUndefined(attachment?.file_url);
-
-    if (!downloadUrl) {
-      return { data: { attachment, file_content: null, file_content_note: "No download URL found in attachment metadata." } };
-    }
-
-    let fileContent: string | null = null;
-    let fileContentNote: string | null = null;
-    let fileContentSource: string | null = null;
-
-    const attachmentFileName = stringOrUndefined(attachment?.file_name) ?? "";
-
-    try {
-      const fileResponse = await fetch(downloadUrl);
-      const contentType = fileResponse.headers.get("content-type") ?? "";
-      const isPdf = contentType.includes("pdf") || attachmentFileName.toLowerCase().endsWith(".pdf");
-      const isText =
-        contentType.startsWith("text/") ||
-        contentType.includes("json") ||
-        contentType.includes("xml") ||
-        contentType.includes("csv");
-
-      if (isPdf) {
-        const buffer = Buffer.from(await fileResponse.arrayBuffer());
-        try {
-          const parser = new PDFParse({ data: buffer });
-          const result = await parser.getText();
-          fileContent = result.text.trim();
-          fileContentSource = "pdf";
-          await parser.destroy();
-        } catch (pdfError) {
-          fileContentNote = `PDF parsing failed: ${pdfError instanceof Error ? pdfError.message : "Unknown error"}`;
-        }
-      } else if (isText) {
-        fileContent = await fileResponse.text();
-        fileContentSource = "text";
-      } else {
-        fileContentNote = `Binary file (${contentType || "unknown type"}) — cannot be read as text.`;
-      }
-    } catch (error) {
-      fileContentNote = `Failed to fetch file: ${error instanceof Error ? error.message : "Unknown error"}`;
-    }
-
-    return { data: { attachment, file_content: fileContent, file_content_note: fileContentNote, file_content_source: fileContentSource } };
   }
 
   async listUsers(): Promise<unknown> {

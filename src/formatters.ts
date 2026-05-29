@@ -164,34 +164,6 @@ export function structuredCreatedDeal(response: unknown): Record<string, unknown
   return { deal: deal ? dealSummary(deal) : undefined };
 }
 
-export function describeAttachments(response: unknown): string {
-  const attachments = arrayFromWrapped(getData(response)?.attachments, "attachment");
-  if (attachments.length === 0) {
-    return "No attachments found.";
-  }
-  return [
-    `Found ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}.`,
-    ...attachments.map((att, i) => `${i + 1}. ${formatAttachmentLine(att)}`)
-  ].join("\n");
-}
-
-export function describeReadAttachment(response: unknown): string {
-  const data = getData(response);
-  const attachment = asRecord(data?.attachment);
-  const fileName = stringOrUndefined(attachment?.file_name) ?? stringOrUndefined(attachment?.name) ?? "Unknown file";
-  const uploadedAt = stringOrUndefined(attachment?.created_at);
-  const fileContent = typeof data?.file_content === "string" ? data.file_content.trim() : null;
-  const fileContentSource = stringOrUndefined(data?.file_content_source);
-  const fileContentNote = stringOrUndefined(data?.file_content_note);
-  const contentLabel = fileContentSource === "pdf" ? "Content (extracted from PDF)" : "Content";
-  return [
-    `File: ${fileName}`,
-    uploadedAt ? `Uploaded: ${uploadedAt}` : undefined,
-    fileContent !== null ? `\n${contentLabel}:\n${fileContent}` : undefined,
-    fileContentNote ? `Note: ${fileContentNote}` : undefined
-  ].filter(Boolean).join("\n");
-}
-
 export function describeUsers(response: unknown): string {
   const users = arrayFromWrapped(getDataValue(response), "user");
   if (users.length === 0) {
@@ -300,21 +272,6 @@ function formatNoteLine(note: RecordValue): string {
   return [text, author ? `author: ${author}` : undefined, created ? `created: ${created}` : undefined, id ? `ID: ${id}` : undefined]
     .filter(Boolean)
     .join(" | ");
-}
-
-function formatAttachmentLine(att: RecordValue): string {
-  const name = stringOrUndefined(att.file_name) ?? stringOrUndefined(att.name) ?? "Unnamed file";
-  const id = stringOrUndefined(att.id);
-  const size = numberOrUndefined(att.file_size) ?? numberOrUndefined(att.size);
-  const uploaded = stringOrUndefined(att.created_at);
-  const uploader = stringOrUndefined(att.uploader_name) ?? stringOrUndefined(att.user_name);
-  return [
-    name,
-    size !== undefined ? `size: ${size}B` : undefined,
-    uploaded ? `uploaded: ${uploaded}` : undefined,
-    uploader ? `by: ${uploader}` : undefined,
-    id ? `ID: ${id}` : undefined
-  ].filter(Boolean).join(" | ");
 }
 
 function formatNoteSearchLine(note: RecordValue): string {

@@ -2,8 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AppConfig, UserCredentials } from "./config.js";
 import {
-  describeAttachments,
-  describeReadAttachment,
   describeNoteSearchResults,
   describeActions,
   describeContact,
@@ -461,66 +459,6 @@ const response = await client.addNote(input);
       try {
         const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  server.registerTool(
-    "debug_raw_contact",
-    {
-      title: "Debug Raw Contact",
-      description: "Temporary tool: returns the full raw JSON response for a contact so every field (including any embedded attachments) is visible.",
-      annotations: { readOnlyHint: true },
-      inputSchema: {
-        contactId: idSchema.describe("The OnePage CRM contact ID.")
-      }
-    },
-    async (input) => {
-      try {
-        const response = await client.getContact(input.contactId);
-        return successResult(JSON.stringify(response, null, 2));
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  server.registerTool(
-    "list_deal_attachments",
-    {
-      title: "List Deal Attachments",
-      description: "List file attachments on a OnePage CRM deal. Returns attachment IDs for use with read_attachment.",
-      annotations: { readOnlyHint: true },
-      inputSchema: {
-        dealId: idSchema.describe("The OnePage CRM deal ID.")
-      }
-    },
-    async (input) => {
-      try {
-        const response = await client.listDealAttachments(input.dealId);
-        return successResult(describeAttachments(response), response);
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  server.registerTool(
-    "read_attachment",
-    {
-      title: "Read Attachment",
-      description: "Fetch an attachment by ID and return its text content. Binary files (PDF, images, etc.) cannot be read as text and will return a note instead.",
-      annotations: { readOnlyHint: true },
-      inputSchema: {
-        attachmentId: idSchema.describe("The OnePage CRM attachment ID (from list_deal_attachments).")
-      }
-    },
-    async (input) => {
-      try {
-        const response = await client.readAttachment(input.attachmentId);
-        return successResult(describeReadAttachment(response), response);
       } catch (error) {
         return errorResult(error);
       }
