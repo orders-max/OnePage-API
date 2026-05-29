@@ -395,7 +395,6 @@ export class OnePageCrmClient {
 
   async editNote(params: { noteId: string; text?: string; date?: string }): Promise<unknown> {
     const body = compactObject({ text: params.text, date: params.date });
-    console.error("EDIT NOTE REQUEST:", "PUT", `/notes/${params.noteId}`, JSON.stringify(body));
     return this.request("PUT", `/notes/${encodeURIComponent(params.noteId)}`, {
       query: { partial: true },
       body

@@ -271,7 +271,7 @@ const response = await client.addNote(input);
     "edit_note",
     {
       title: "Edit Note",
-      description: "Temporary tool: update an existing note by ID.",
+      description: "Use this to edit an existing note in OnePage CRM. Provide noteId plus text and/or date to update.",
       inputSchema: {
         noteId: idSchema.describe("The OnePage CRM note ID."),
         text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
@@ -280,6 +280,9 @@ const response = await client.addNote(input);
     },
     async (input) => {
       try {
+        if (!input.text && !input.date) {
+          throw new Error("Provide at least one of text or date to update.");
+        }
         const response = await client.editNote(input);
         return successResult(JSON.stringify(response), response);
       } catch (error) {
