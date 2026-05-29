@@ -268,6 +268,27 @@ const response = await client.addNote(input);
   );
 
   server.registerTool(
+    "edit_note",
+    {
+      title: "Edit Note",
+      description: "Temporary tool: update an existing note by ID.",
+      inputSchema: {
+        noteId: idSchema.describe("The OnePage CRM note ID."),
+        text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
+        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format.")
+      }
+    },
+    async (input) => {
+      try {
+        const response = await client.editNote(input);
+        return successResult(JSON.stringify(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_deals",
     {
       title: "List Deals",
