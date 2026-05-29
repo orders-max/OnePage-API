@@ -49,6 +49,23 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   });
 
   server.registerTool(
+    "debug_bootstrap",
+    {
+      title: "Debug Bootstrap",
+      description: "Temporary tool: fetches the OnePageCRM bootstrap endpoint and returns the raw response for inspection.",
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const response = await client.testConnection();
+        return successResult(JSON.stringify(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "search_contacts",
     {
       title: "Search Contacts",
