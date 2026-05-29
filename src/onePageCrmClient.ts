@@ -400,7 +400,9 @@ export class OnePageCrmClient {
   }
 
   async getDeal(dealId: string): Promise<unknown> {
-    return this.request("GET", `/deals/${encodeURIComponent(dealId)}`);
+    const response = await this.request("GET", `/deals/${encodeURIComponent(dealId)}`);
+    console.error("DEAL RAW:", JSON.stringify(response));
+    return response;
   }
 
   async createDeal(params: {
