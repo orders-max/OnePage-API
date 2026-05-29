@@ -219,6 +219,38 @@ const response = await client.createAction(input);
   );
 
   server.registerTool(
+    "edit_task",
+    {
+      title: "Edit Task",
+      description: "Use this to update an existing OnePage CRM task. Provide taskId plus at least one field to change. Use mark_task_done to complete a task.",
+      inputSchema: {
+        taskId: idSchema.describe("The OnePage CRM action/task ID."),
+        text: z.string().trim().min(1).max(140).optional().describe("Updated task text. Maximum 140 characters."),
+        dueDate: dateSchema.optional().describe("Updated due date in YYYY-MM-DD format."),
+        assigneeId: idSchema.optional().describe("OnePage CRM user ID to reassign the task to."),
+        status: actionStatusSchema.exclude(["done"]).optional().describe("Updated task status. Use mark_task_done to complete a task.")
+      }
+    },
+    async (input) => {
+      try {
+        if (!input.text && !input.dueDate && !input.assigneeId && !input.status) {
+          throw new Error("Provide at least one of text, dueDate, assigneeId, or status to update.");
+        }
+        const response = await client.editAction({
+          actionId: input.taskId,
+          text: input.text,
+          date: input.dueDate,
+          assigneeId: input.assigneeId,
+          status: input.status
+        });
+        return successResult(describeCreatedAction(response), structuredActions(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_notes",
     {
       title: "List Notes",

@@ -376,6 +376,30 @@ export class OnePageCrmClient {
     return this.request("POST", "/actions", { body: compactObject(body) });
   }
 
+  async editAction(params: {
+    actionId: string;
+    text?: string;
+    date?: string;
+    assigneeId?: string;
+    status?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      text: params.text,
+      date: params.date,
+      assignee_id: params.assigneeId,
+      status: params.status
+    });
+
+    if (Object.keys(body).length === 0) {
+      throw new Error("Provide at least one of text, date, assigneeId, or status to update.");
+    }
+
+    return this.request("PUT", `/actions/${encodeURIComponent(params.actionId)}`, {
+      query: { partial: true },
+      body
+    });
+  }
+
   async addNote(params: {
     contactId: string;
     text: string;
