@@ -563,9 +563,22 @@ export class OnePageCrmClient {
   }
 
   async listDealAttachments(dealId: string): Promise<unknown> {
-    const path = `/deals/${encodeURIComponent(dealId)}/attachments`;
-    console.error("LIST_DEAL_ATTACHMENTS URL:", `${this.endpoint}${path}`);
-    return this.request("GET", path);
+    // /deals/{id}/attachments returns 404 — try the generic attachments endpoint with query params.
+    // OnePageCRM reference_type may be Pascal-cased; try both variants sequentially.
+    for (const referenceType of ["Deal", "deal"]) {
+      const query = { reference_id: dealId, reference_type: referenceType };
+      const params = new URLSearchParams({ reference_id: dealId, reference_type: referenceType }).toString();
+      console.error(`LIST_DEAL_ATTACHMENTS trying: GET ${this.endpoint}/attachments?${params}`);
+      try {
+        const result = await this.request("GET", "/attachments", { query });
+        console.error(`LIST_DEAL_ATTACHMENTS success with reference_type="${referenceType}"`);
+        return result;
+      } catch (err) {
+        const status = err instanceof OnePageCrmApiError ? err.status : "?";
+        console.error(`LIST_DEAL_ATTACHMENTS reference_type="${referenceType}" failed: HTTP ${status}`);
+      }
+    }
+    throw new OnePageCrmApiError(404, "No attachments endpoint found. Tried reference_type=Deal and reference_type=deal.");
   }
 
   async readAttachment(attachmentId: string): Promise<unknown> {
