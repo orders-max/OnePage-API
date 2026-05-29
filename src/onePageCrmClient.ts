@@ -560,6 +560,50 @@ export class OnePageCrmClient {
     });
   }
 
+  async listDealAttachments(dealId: string): Promise<unknown> {
+    return this.request("GET", "/attachments", {
+      query: { reference_id: dealId, reference_type: "deal" }
+    });
+  }
+
+  async readAttachment(attachmentId: string): Promise<unknown> {
+    const metaResponse = await this.request("GET", `/attachments/${encodeURIComponent(attachmentId)}`);
+    const data = isRecord(metaResponse) && isRecord(metaResponse.data) ? metaResponse.data : undefined;
+    const attachment = isRecord(data?.attachment) ? data.attachment : undefined;
+
+    const downloadUrl =
+      stringOrUndefined(attachment?.url) ??
+      stringOrUndefined(attachment?.download_url) ??
+      stringOrUndefined(attachment?.file_url);
+
+    if (!downloadUrl) {
+      return { data: { attachment, file_content: null, file_content_note: "No download URL found in attachment metadata." } };
+    }
+
+    let fileContent: string | null = null;
+    let fileContentNote: string | null = null;
+
+    try {
+      const fileResponse = await fetch(downloadUrl);
+      const contentType = fileResponse.headers.get("content-type") ?? "";
+      const isText =
+        contentType.startsWith("text/") ||
+        contentType.includes("json") ||
+        contentType.includes("xml") ||
+        contentType.includes("csv");
+
+      if (!isText) {
+        fileContentNote = `Binary file (${contentType || "unknown type"}) — cannot be read as text.`;
+      } else {
+        fileContent = await fileResponse.text();
+      }
+    } catch (error) {
+      fileContentNote = `Failed to fetch file: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
+
+    return { data: { attachment, file_content: fileContent, file_content_note: fileContentNote } };
+  }
+
   async listUsers(): Promise<unknown> {
     return this.request("GET", "/users");
   }
