@@ -355,7 +355,7 @@ const response = await client.addNote(input);
     "get_deal",
     {
       title: "Get Deal",
-      description: "Fetch one OnePage CRM deal by ID.",
+      description: "Fetch one OnePage CRM deal by ID. The response includes contact_id (and contact_ids if multiple) so you can call add_note with both linkedDealId and contactId without a separate contact lookup.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         dealId: idSchema.describe("The OnePage CRM deal ID.")

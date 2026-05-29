@@ -272,12 +272,20 @@ function formatDealLine(deal: RecordValue): string {
   const stage = numberOrUndefined(deal.stage);
   const closeDate = stringOrUndefined(deal.expected_close_date) ?? stringOrUndefined(deal.close_date);
   const description = stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description);
+  const contactName = stringOrUndefined(deal.contact_name);
+  const contactId = stringOrUndefined(deal.contact_id);
+  const contactPiece = contactName
+    ? `contact: ${contactName}${contactId ? ` (ID: ${contactId})` : ""}`
+    : contactId
+      ? `contact ID: ${contactId}`
+      : undefined;
   return [
     name,
     value !== undefined ? `value: ${value}` : undefined,
     stage !== undefined ? `stage: ${stage}` : undefined,
     status ? `status: ${status}` : undefined,
     closeDate ? `close: ${closeDate}` : undefined,
+    contactPiece,
     description ? `description: ${description}` : undefined,
     id ? `ID: ${id}` : undefined
   ]
@@ -417,14 +425,26 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
       }
     }
   }
+  const contactIds: string[] = [];
+  if (Array.isArray(deal.contacts)) {
+    for (const item of deal.contacts) {
+      const c = asRecord(item);
+      const cid = stringOrUndefined(c?.id) ?? stringOrUndefined(c?.contact_id);
+      if (cid && !contactIds.includes(cid)) contactIds.push(cid);
+    }
+  }
+  const primaryContactId = stringOrUndefined(deal.contact_id) ?? contactIds[0];
+  if (primaryContactId && !contactIds.includes(primaryContactId)) contactIds.unshift(primaryContactId);
+
   return {
     id: stringOrUndefined(deal.id),
     name: stringOrUndefined(deal.name),
     value: numberOrUndefined(deal.amount) ?? numberOrUndefined(deal.total_amount),
     stage: numberOrUndefined(deal.stage),
     status: normalizeDealStatus(stringOrUndefined(deal.status)),
-    contact_id: stringOrUndefined(deal.contact_id),
+    contact_id: primaryContactId,
     contact_name: stringOrUndefined(deal.contact_name),
+    contact_ids: contactIds.length > 1 ? contactIds : undefined,
     owner_id: stringOrUndefined(deal.owner_id),
     owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
