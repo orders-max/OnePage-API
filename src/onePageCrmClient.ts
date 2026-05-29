@@ -400,9 +400,7 @@ export class OnePageCrmClient {
   }
 
   async getDeal(dealId: string): Promise<unknown> {
-    const response = await this.request("GET", `/deals/${encodeURIComponent(dealId)}`);
-    console.error("DEAL RAW:", JSON.stringify(response));
-    return response;
+    return this.request("GET", `/deals/${encodeURIComponent(dealId)}`);
   }
 
   async createDeal(params: {
@@ -423,7 +421,7 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status) ?? "pending",
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      body: params.description
+      text: params.description
     });
     return this.request("POST", "/deals", { body });
   }
@@ -445,7 +443,7 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status),
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      body: params.description
+      text: params.description
     });
 
     if (Object.keys(body).length === 0) {
@@ -510,7 +508,6 @@ export class OnePageCrmClient {
       }
     }
 
-    console.error(`API REQUEST: ${method} ${path}`, JSON.stringify(options.body ?? {}));
     let response: Response;
     try {
       response = await fetch(url, {
