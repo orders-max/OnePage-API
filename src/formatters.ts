@@ -180,12 +180,14 @@ export function describeReadAttachment(response: unknown): string {
   const attachment = asRecord(data?.attachment);
   const fileName = stringOrUndefined(attachment?.file_name) ?? stringOrUndefined(attachment?.name) ?? "Unknown file";
   const uploadedAt = stringOrUndefined(attachment?.created_at);
-  const fileContent = typeof data?.file_content === "string" ? data.file_content : null;
+  const fileContent = typeof data?.file_content === "string" ? data.file_content.trim() : null;
+  const fileContentSource = stringOrUndefined(data?.file_content_source);
   const fileContentNote = stringOrUndefined(data?.file_content_note);
+  const contentLabel = fileContentSource === "pdf" ? "Content (extracted from PDF)" : "Content";
   return [
     `File: ${fileName}`,
     uploadedAt ? `Uploaded: ${uploadedAt}` : undefined,
-    fileContent !== null ? `\nContent:\n${fileContent}` : undefined,
+    fileContent !== null ? `\n${contentLabel}:\n${fileContent}` : undefined,
     fileContentNote ? `Note: ${fileContentNote}` : undefined
   ].filter(Boolean).join("\n");
 }

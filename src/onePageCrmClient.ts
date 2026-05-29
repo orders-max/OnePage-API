@@ -1,3 +1,5 @@
+import { PDFParse } from "pdf-parse";
+
 type QueryValue = string | number | boolean | undefined | null;
 type RawContact = Record<string, unknown> & {
   id?: string;
@@ -582,26 +584,42 @@ export class OnePageCrmClient {
 
     let fileContent: string | null = null;
     let fileContentNote: string | null = null;
+    let fileContentSource: string | null = null;
+
+    const attachmentFileName = stringOrUndefined(attachment?.file_name) ?? "";
 
     try {
       const fileResponse = await fetch(downloadUrl);
       const contentType = fileResponse.headers.get("content-type") ?? "";
+      const isPdf = contentType.includes("pdf") || attachmentFileName.toLowerCase().endsWith(".pdf");
       const isText =
         contentType.startsWith("text/") ||
         contentType.includes("json") ||
         contentType.includes("xml") ||
         contentType.includes("csv");
 
-      if (!isText) {
-        fileContentNote = `Binary file (${contentType || "unknown type"}) — cannot be read as text.`;
-      } else {
+      if (isPdf) {
+        const buffer = Buffer.from(await fileResponse.arrayBuffer());
+        try {
+          const parser = new PDFParse({ data: buffer });
+          const result = await parser.getText();
+          fileContent = result.text.trim();
+          fileContentSource = "pdf";
+          await parser.destroy();
+        } catch (pdfError) {
+          fileContentNote = `PDF parsing failed: ${pdfError instanceof Error ? pdfError.message : "Unknown error"}`;
+        }
+      } else if (isText) {
         fileContent = await fileResponse.text();
+        fileContentSource = "text";
+      } else {
+        fileContentNote = `Binary file (${contentType || "unknown type"}) — cannot be read as text.`;
       }
     } catch (error) {
       fileContentNote = `Failed to fetch file: ${error instanceof Error ? error.message : "Unknown error"}`;
     }
 
-    return { data: { attachment, file_content: fileContent, file_content_note: fileContentNote } };
+    return { data: { attachment, file_content: fileContent, file_content_note: fileContentNote, file_content_source: fileContentSource } };
   }
 
   async listUsers(): Promise<unknown> {
