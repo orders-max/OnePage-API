@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AppConfig, UserCredentials } from "./config.js";
 import {
+  describeNoteSearchResults,
   describeActions,
   describeContact,
   describeContactSearch,
@@ -244,6 +245,27 @@ const response = await client.createAction(input);
           status: input.status
         });
         return successResult(describeCreatedAction(response), structuredActions(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_notes",
+    {
+      title: "Search Notes",
+      description:
+        "Search across all notes in OnePage CRM by keyword. Fetches all pages and filters client-side. Results include note ID (for edit_note), contact ID (for add_note), contact name, and note text.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        keyword: z.string().trim().min(1).max(200).describe("Keyword to search for in note text.")
+      }
+    },
+    async (input) => {
+      try {
+        const response = await client.searchNotes(input.keyword);
+        return successResult(describeNoteSearchResults(response), structuredNotes(response));
       } catch (error) {
         return errorResult(error);
       }

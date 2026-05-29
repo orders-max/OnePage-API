@@ -130,6 +130,16 @@ export function describeNotes(response: unknown): string {
   return notes.map((note, index) => `${index + 1}. ${formatNoteLine(note)}`).join("\n");
 }
 
+export function describeNoteSearchResults(response: unknown): string {
+  const notes = arrayFromWrapped(getData(response)?.notes, "note");
+  if (notes.length === 0) {
+    return "No notes matched that keyword.";
+  }
+  return [`Found ${notes.length} note${notes.length === 1 ? "" : "s"}.`,
+    ...notes.map((note, index) => `${index + 1}. ${formatNoteSearchLine(note)}`)
+  ].join("\n");
+}
+
 export function describeDeals(response: unknown): string {
   const deals = arrayFromWrapped(getData(response)?.deals, "deal");
   if (deals.length === 0) {
@@ -260,6 +270,22 @@ function formatNoteLine(note: RecordValue): string {
   const created = stringOrUndefined(note.created_at) ?? stringOrUndefined(note.date);
   const id = stringOrUndefined(note.id);
   return [text, author ? `author: ${author}` : undefined, created ? `created: ${created}` : undefined, id ? `ID: ${id}` : undefined]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatNoteSearchLine(note: RecordValue): string {
+  const text = stringOrUndefined(note.text) ?? "Untitled note";
+  const date = stringOrUndefined(note.created_at) ?? stringOrUndefined(note.date);
+  const contactName = stringOrUndefined(note.contact_name);
+  const contactId = stringOrUndefined(note.contact_id);
+  const id = stringOrUndefined(note.id);
+  const contactPiece = contactName
+    ? `contact: ${contactName}${contactId ? ` (ID: ${contactId})` : ""}`
+    : contactId
+      ? `contact ID: ${contactId}`
+      : undefined;
+  return [text, date ? `date: ${date}` : undefined, contactPiece, id ? `note ID: ${id}` : undefined]
     .filter(Boolean)
     .join(" | ");
 }

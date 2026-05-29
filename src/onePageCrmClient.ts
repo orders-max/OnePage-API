@@ -425,6 +425,52 @@ export class OnePageCrmClient {
     });
   }
 
+  async searchNotes(keyword: string): Promise<unknown> {
+    const perPage = 100;
+    const lower = keyword.toLowerCase();
+
+    const firstResponse = await this.request("GET", "/notes", { query: { page: 1, per_page: perPage } });
+    const firstData = isRecord(firstResponse) && isRecord(firstResponse.data) ? firstResponse.data : undefined;
+    const firstNotes: unknown[] = Array.isArray(firstData?.notes) ? firstData.notes : [];
+    const totalCount = numberOrUndefined(firstData?.total_count);
+    const maxPage = numberOrUndefined(firstData?.max_page);
+
+    let lastPage: number;
+    if (maxPage !== undefined) {
+      lastPage = maxPage;
+    } else if (totalCount !== undefined) {
+      lastPage = Math.ceil(totalCount / perPage);
+    } else {
+      lastPage = 1;
+    }
+
+    const remainingPageNumbers: number[] = [];
+    for (let p = 2; p <= lastPage; p++) remainingPageNumbers.push(p);
+
+    const remainingResponses = await Promise.all(
+      remainingPageNumbers.map((p, i) =>
+        new Promise<unknown>(resolve => setTimeout(resolve, i * 300)).then(() =>
+          this.request("GET", "/notes", { query: { page: p, per_page: perPage } })
+        )
+      )
+    );
+
+    const allNotes: unknown[] = [...firstNotes];
+    for (const response of remainingResponses) {
+      const data = isRecord(response) && isRecord(response.data) ? response.data : undefined;
+      if (Array.isArray(data?.notes)) allNotes.push(...data.notes);
+    }
+
+    const matching = allNotes.filter((item: unknown) => {
+      if (!isRecord(item)) return false;
+      const note = isRecord(item.note) ? item.note : item;
+      const text = stringOrUndefined((note as Record<string, unknown>).text);
+      return text !== undefined && text.toLowerCase().includes(lower);
+    });
+
+    return { data: { notes: matching, total_count: matching.length } };
+  }
+
   async listNotes(params: { contactId?: string; page?: number; perPage?: number }): Promise<unknown> {
     if (params.contactId) {
       return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
