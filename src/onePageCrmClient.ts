@@ -562,23 +562,21 @@ export class OnePageCrmClient {
     });
   }
 
+  async listContactAttachments(contactId: string): Promise<unknown> {
+    return this.request("GET", `/contacts/${encodeURIComponent(contactId)}/attachments`);
+  }
+
   async listDealAttachments(dealId: string): Promise<unknown> {
-    // /deals/{id}/attachments returns 404 — try the generic attachments endpoint with query params.
-    // OnePageCRM reference_type may be Pascal-cased; try both variants sequentially.
-    for (const referenceType of ["Deal", "deal"]) {
-      const query = { reference_id: dealId, reference_type: referenceType };
-      const params = new URLSearchParams({ reference_id: dealId, reference_type: referenceType }).toString();
-      console.error(`LIST_DEAL_ATTACHMENTS trying: GET ${this.endpoint}/attachments?${params}`);
-      try {
-        const result = await this.request("GET", "/attachments", { query });
-        console.error(`LIST_DEAL_ATTACHMENTS success with reference_type="${referenceType}"`);
-        return result;
-      } catch (err) {
-        const status = err instanceof OnePageCrmApiError ? err.status : "?";
-        console.error(`LIST_DEAL_ATTACHMENTS reference_type="${referenceType}" failed: HTTP ${status}`);
-      }
+    // Attachments in OnePageCRM are stored at the contact level, not the deal level.
+    // Look up the deal to get its linked contactId, then fetch contact attachments.
+    const dealResponse = await this.getDeal(dealId);
+    const data = isRecord(dealResponse) && isRecord(dealResponse.data) ? dealResponse.data : undefined;
+    const deal = isRecord(data?.deal) ? data.deal : undefined;
+    const contactId = stringOrUndefined(deal?.contact_id);
+    if (!contactId) {
+      throw new Error("Could not determine contact ID from deal — cannot fetch attachments.");
     }
-    throw new OnePageCrmApiError(404, "No attachments endpoint found. Tried reference_type=Deal and reference_type=deal.");
+    return this.listContactAttachments(contactId);
   }
 
   async readAttachment(attachmentId: string): Promise<unknown> {

@@ -468,6 +468,25 @@ const response = await client.addNote(input);
   );
 
   server.registerTool(
+    "debug_contact_attachments",
+    {
+      title: "Debug Contact Attachments",
+      description: "Temporary tool: fetch attachments directly by contact ID to confirm the endpoint works.",
+      inputSchema: {
+        contactId: idSchema.describe("The OnePage CRM contact ID.")
+      }
+    },
+    async (input) => {
+      try {
+        const response = await client.listContactAttachments(input.contactId);
+        return successResult(describeAttachments(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_deal_attachments",
     {
       title: "List Deal Attachments",
