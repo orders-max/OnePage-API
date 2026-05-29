@@ -563,9 +563,9 @@ export class OnePageCrmClient {
   }
 
   async listDealAttachments(dealId: string): Promise<unknown> {
-    return this.request("GET", "/attachments", {
-      query: { reference_id: dealId, reference_type: "deal" }
-    });
+    const path = `/deals/${encodeURIComponent(dealId)}/attachments`;
+    console.error("LIST_DEAL_ATTACHMENTS URL:", `${this.endpoint}${path}`);
+    return this.request("GET", path);
   }
 
   async readAttachment(attachmentId: string): Promise<unknown> {
