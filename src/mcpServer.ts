@@ -7,6 +7,7 @@ import {
   describeContactSearch,
   describeCalls,
   describeCreatedAction,
+  describeCreatedDeal,
   describeDeal,
   describeDeals,
   describeDoneAction,
@@ -17,6 +18,7 @@ import {
   errorResult,
   structuredActions,
   structuredCalls,
+  structuredCreatedDeal,
   structuredCreatedNote,
   structuredDeal,
   structuredDeals,
@@ -314,19 +316,50 @@ const response = await client.addNote(input);
   );
 
   server.registerTool(
-    "update_deal",
+    "create_deal",
     {
-      title: "Update Deal",
-      description: "Update a OnePage CRM deal stage or status. Status open maps to OnePage CRM pending deals.",
+      title: "Create Deal",
+      description: "Create a new deal in OnePage CRM linked to a contact.",
       inputSchema: {
-        dealId: idSchema.describe("The OnePage CRM deal ID."),
+        contactId: idSchema.describe("The contact ID to link this deal to."),
+        name: z.string().trim().min(1).max(255).describe("Deal name."),
+        amount: z.number().min(0).optional().describe("Deal value amount."),
         stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
-        status: dealStatusSchema.optional().describe("Deal status: open, won, or lost.")
+        status: dealStatusSchema.optional().describe("Deal status: open, won, or lost. Defaults to open."),
+        expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
+        ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
+        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes.")
       }
     },
     async (input) => {
       try {
-const response = await client.updateDeal(input);
+        const response = await client.createDeal(input);
+        return successResult(describeCreatedDeal(response), structuredCreatedDeal(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_deal",
+    {
+      title: "Update Deal",
+      description: "Update a OnePage CRM deal. Status open maps to OnePage CRM pending deals.",
+      inputSchema: {
+        dealId: idSchema.describe("The OnePage CRM deal ID."),
+        name: z.string().trim().min(1).max(255).optional().describe("Deal name."),
+        amount: z.number().min(0).optional().describe("Deal value amount."),
+        stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
+        status: dealStatusSchema.optional().describe("Deal status: open, won, or lost."),
+        expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
+        ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
+        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes.")
+      }
+    },
+    async (input) => {
+      try {
+        const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
       } catch (error) {
         return errorResult(error);

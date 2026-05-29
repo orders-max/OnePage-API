@@ -132,6 +132,17 @@ export function describeDeal(response: unknown): string {
   return deal ? formatDealLine(deal) : "The deal was returned, but the response did not include deal details.";
 }
 
+export function describeCreatedDeal(response: unknown): string {
+  const deal = asRecord(getData(response)?.deal);
+  if (!deal) return "The deal was created.";
+  return `Created deal: ${formatDealLine(deal)}`;
+}
+
+export function structuredCreatedDeal(response: unknown): Record<string, unknown> {
+  const deal = asRecord(getData(response)?.deal);
+  return { deal: deal ? dealSummary(deal) : undefined };
+}
+
 export function describeUsers(response: unknown): string {
   const users = arrayFromWrapped(getDataValue(response), "user");
   if (users.length === 0) {
@@ -392,6 +403,7 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     owner_id: stringOrUndefined(deal.owner_id),
     owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
+    description: stringOrUndefined(deal.description),
     created_at: stringOrUndefined(deal.created_at)
   };
 }

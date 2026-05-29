@@ -403,14 +403,51 @@ export class OnePageCrmClient {
     return this.request("GET", `/deals/${encodeURIComponent(dealId)}`);
   }
 
-  async updateDeal(params: { dealId: string; stage?: number; status?: string }): Promise<unknown> {
+  async createDeal(params: {
+    contactId: string;
+    name: string;
+    amount?: number;
+    stage?: number;
+    status?: string;
+    expectedCloseDate?: string;
+    ownerId?: string;
+    description?: string;
+  }): Promise<unknown> {
     const body = compactObject({
+      contact_id: params.contactId,
+      name: params.name,
+      amount: params.amount,
       stage: params.stage,
-      status: mapDealStatus(params.status)
+      status: mapDealStatus(params.status) ?? "pending",
+      expected_close_date: params.expectedCloseDate,
+      owner_id: params.ownerId,
+      description: params.description
+    });
+    return this.request("POST", "/deals", { body });
+  }
+
+  async updateDeal(params: {
+    dealId: string;
+    name?: string;
+    amount?: number;
+    stage?: number;
+    status?: string;
+    expectedCloseDate?: string;
+    ownerId?: string;
+    description?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      name: params.name,
+      amount: params.amount,
+      stage: params.stage,
+      status: mapDealStatus(params.status),
+      expected_close_date: params.expectedCloseDate,
+      owner_id: params.ownerId,
+      description: params.description
     });
 
     if (Object.keys(body).length === 0) {
-      throw new Error("Provide at least one deal field to update: stage or status.");
+      throw new Error("Provide at least one deal field to update.");
     }
 
     return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
