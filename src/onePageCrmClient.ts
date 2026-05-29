@@ -508,6 +508,7 @@ export class OnePageCrmClient {
       }
     }
 
+    console.error(`API REQUEST: ${method} ${path}`, JSON.stringify(options.body ?? {}));
     let response: Response;
     try {
       response = await fetch(url, {
