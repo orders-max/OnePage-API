@@ -49,23 +49,6 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   });
 
   server.registerTool(
-    "debug_bootstrap",
-    {
-      title: "Debug Bootstrap",
-      description: "Temporary tool: fetches the OnePageCRM bootstrap endpoint and returns the raw response for inspection.",
-      inputSchema: {}
-    },
-    async () => {
-      try {
-        const response = await client.testConnection();
-        return successResult(JSON.stringify(response));
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  server.registerTool(
     "search_contacts",
     {
       title: "Search Contacts",
@@ -345,7 +328,17 @@ const response = await client.addNote(input);
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost. Defaults to open."),
         expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
         ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
-        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes.")
+        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes."),
+        dealFields: z.object({
+          customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
+          mmkPo: z.string().trim().min(1).max(255).optional().describe("MMK PO #"),
+          customerTracking: z.string().trim().min(1).max(255).optional().describe("Customer Tracking #"),
+          netTerms: z.string().trim().min(1).max(255).optional().describe("Net Terms"),
+          salesPerson: z.string().trim().min(1).max(255).optional().describe("Sales Person"),
+          vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
+          estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
+          shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
+        }).optional().describe("Custom deal fields.")
       }
     },
     async (input) => {
@@ -371,7 +364,17 @@ const response = await client.addNote(input);
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost."),
         expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
         ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
-        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes.")
+        description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes."),
+        dealFields: z.object({
+          customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
+          mmkPo: z.string().trim().min(1).max(255).optional().describe("MMK PO #"),
+          customerTracking: z.string().trim().min(1).max(255).optional().describe("Customer Tracking #"),
+          netTerms: z.string().trim().min(1).max(255).optional().describe("Net Terms"),
+          salesPerson: z.string().trim().min(1).max(255).optional().describe("Sales Person"),
+          vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
+          estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
+          shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
+        }).optional().describe("Custom deal fields.")
       }
     },
     async (input) => {

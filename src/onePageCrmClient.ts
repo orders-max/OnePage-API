@@ -14,6 +14,28 @@ export type OnePageCrmContact = Record<string, unknown>;
 export type OnePageCrmAction = Record<string, unknown>;
 export type OnePageCrmNote = Record<string, unknown>;
 
+type DealCustomFields = {
+  customerPo?: string;
+  mmkPo?: string;
+  customerTracking?: string;
+  netTerms?: string;
+  salesPerson?: string;
+  vendorTracking?: string;
+  estimatedCloseDate?: string;
+  shippingInstructions?: string;
+};
+
+const DEAL_FIELD_IDS: Record<keyof DealCustomFields, string> = {
+  customerPo: "67bfa40ea43bdc7f3701cf1b",
+  mmkPo: "67bfa420a43bdc7f3701cfe6",
+  customerTracking: "67bfa49ca43bdcb737f00986",
+  netTerms: "69b84be766af32f2db7a29a9",
+  salesPerson: "69b84bfa818d59bcec706b98",
+  vendorTracking: "69b84c3e818d59bcec707595",
+  estimatedCloseDate: "69b84d1066af32f2db7a4b29",
+  shippingInstructions: "6a0df7fe176183e823f224ea"
+};
+
 export class OnePageCrmApiError extends Error {
   readonly status: number;
   readonly crmMessage?: string;
@@ -45,9 +67,7 @@ export class OnePageCrmClient {
   }
 
   async testConnection(): Promise<unknown> {
-    const response = await this.request("GET", "/bootstrap");
-    console.error("BOOTSTRAP:", JSON.stringify(response));
-    return response;
+    return this.request("GET", "/bootstrap");
   }
 
   async searchContacts(params: {
@@ -414,6 +434,7 @@ export class OnePageCrmClient {
     expectedCloseDate?: string;
     ownerId?: string;
     description?: string;
+    dealFields?: DealCustomFields;
   }): Promise<unknown> {
     const body = compactObject({
       contact_id: params.contactId,
@@ -423,7 +444,8 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status) ?? "pending",
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      text: params.description
+      text: params.description,
+      deal_fields: buildDealFields(params.dealFields)
     });
     return this.request("POST", "/deals", { body });
   }
@@ -437,6 +459,7 @@ export class OnePageCrmClient {
     expectedCloseDate?: string;
     ownerId?: string;
     description?: string;
+    dealFields?: DealCustomFields;
   }): Promise<unknown> {
     const body = compactObject({
       name: params.name,
@@ -445,10 +468,11 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status),
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      text: params.description
+      text: params.description,
+      deal_fields: buildDealFields(params.dealFields)
     });
 
-    if (Object.keys(body).length === 0) {
+    if (Object.keys(body).length === 0 && !params.dealFields) {
       throw new Error("Provide at least one deal field to update.");
     }
 
@@ -533,6 +557,16 @@ export class OnePageCrmClient {
 
     return payload.value;
   }
+}
+
+function buildDealFields(fields: DealCustomFields | undefined): Array<{ id: string; value: string }> | undefined {
+  if (!fields) return undefined;
+  const result: Array<{ id: string; value: string }> = [];
+  for (const key of Object.keys(DEAL_FIELD_IDS) as Array<keyof DealCustomFields>) {
+    const value = fields[key];
+    if (value) result.push({ id: DEAL_FIELD_IDS[key], value });
+  }
+  return result.length > 0 ? result : undefined;
 }
 
 function compactObject(value: Record<string, unknown>): Record<string, unknown> {

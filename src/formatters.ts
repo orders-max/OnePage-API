@@ -1,5 +1,16 @@
 import { OnePageCrmApiError } from "./onePageCrmClient.js";
 
+const DEAL_FIELD_NAMES: Record<string, string> = {
+  "67bfa40ea43bdc7f3701cf1b": "customerPo",
+  "67bfa420a43bdc7f3701cfe6": "mmkPo",
+  "67bfa49ca43bdcb737f00986": "customerTracking",
+  "69b84be766af32f2db7a29a9": "netTerms",
+  "69b84bfa818d59bcec706b98": "salesPerson",
+  "69b84c3e818d59bcec707595": "vendorTracking",
+  "69b84d1066af32f2db7a4b29": "estimatedCloseDate",
+  "6a0df7fe176183e823f224ea": "shippingInstructions"
+};
+
 type RecordValue = Record<string, unknown>;
 
 export function successResult(text: string, structuredContent?: unknown) {
@@ -394,6 +405,18 @@ function noteSummary(note: RecordValue): Record<string, unknown> {
 }
 
 function dealSummary(deal: RecordValue): Record<string, unknown> {
+  const customFields: Record<string, string> = {};
+  if (Array.isArray(deal.deal_fields)) {
+    for (const field of deal.deal_fields) {
+      const f = asRecord(field);
+      const id = stringOrUndefined(f?.id);
+      const value = stringOrUndefined(f?.value);
+      if (id && value) {
+        const name = DEAL_FIELD_NAMES[id];
+        if (name) customFields[name] = value;
+      }
+    }
+  }
   return {
     id: stringOrUndefined(deal.id),
     name: stringOrUndefined(deal.name),
@@ -406,7 +429,8 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
     description: stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description),
-    created_at: stringOrUndefined(deal.created_at)
+    created_at: stringOrUndefined(deal.created_at),
+    ...(Object.keys(customFields).length > 0 ? { custom_fields: customFields } : {})
   };
 }
 
