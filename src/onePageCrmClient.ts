@@ -45,7 +45,9 @@ export class OnePageCrmClient {
   }
 
   async testConnection(): Promise<unknown> {
-    return this.request("GET", "/bootstrap");
+    const response = await this.request("GET", "/bootstrap");
+    console.error("BOOTSTRAP:", JSON.stringify(response));
+    return response;
   }
 
   async searchContacts(params: {
