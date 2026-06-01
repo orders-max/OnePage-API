@@ -44,6 +44,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     userId: userCreds?.userId ?? config.onePageCrmUserId,
     apiKey: userCreds?.apiKey ?? config.onePageCrmApiKey
   });
+  const userId = userCreds?.userId ?? config.onePageCrmUserId;
   const server = new McpServer({
     name: "onepagecrm-mcp-server",
     version: "0.1.0"
@@ -65,6 +66,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "search_contacts", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.searchContacts({
           query: input.query,
@@ -91,6 +93,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "get_contact", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.getContact(input.contactId);
         return successResult(describeContact(response), response);
@@ -117,8 +120,9 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "create_contact", userId, ts: new Date().toISOString()}));
       try {
-const response = await client.createContact(input);
+        const response = await client.createContact(input);
         return successResult(describeContact(response), response);
       } catch (error) {
         return errorResult(error);
@@ -155,6 +159,7 @@ const response = await client.createContact(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_tasks", userId, ts: new Date().toISOString()}));
       try {
         if (input.contactId && input.companyId) {
           throw new Error("Use either contactId or companyId, not both.");
@@ -210,8 +215,9 @@ const response = await client.createContact(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "create_task", userId, ts: new Date().toISOString()}));
       try {
-const response = await client.createAction(input);
+        const response = await client.createAction(input);
         return successResult(describeCreatedAction(response), response);
       } catch (error) {
         return errorResult(error);
@@ -233,6 +239,7 @@ const response = await client.createAction(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "edit_task", userId, ts: new Date().toISOString()}));
       try {
         if (!input.text && !input.dueDate && !input.assigneeId && !input.status) {
           throw new Error("Provide at least one of text, dueDate, assigneeId, or status to update.");
@@ -263,6 +270,7 @@ const response = await client.createAction(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "search_notes", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.searchNotes(input.keyword);
         return successResult(describeNoteSearchResults(response), structuredNotes(response));
@@ -285,6 +293,7 @@ const response = await client.createAction(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_notes", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.listNotes({
           contactId: input.contactId,
@@ -312,8 +321,9 @@ const response = await client.createAction(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "add_note", userId, ts: new Date().toISOString()}));
       try {
-const response = await client.addNote(input);
+        const response = await client.addNote(input);
         return successResult(describeNote(response), structuredCreatedNote(response));
       } catch (error) {
         return errorResult(error);
@@ -333,6 +343,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "edit_note", userId, ts: new Date().toISOString()}));
       try {
         if (!input.text && !input.date) {
           throw new Error("Provide at least one of text or date to update.");
@@ -359,6 +370,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_deals", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.listDeals({
           contactId: input.contactId,
@@ -384,6 +396,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "get_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.getDeal(input.dealId);
         return successResult(describeDeal(response), structuredDeal(response));
@@ -420,6 +433,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "create_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.createDeal(input);
         return successResult(describeCreatedDeal(response), structuredCreatedDeal(response));
@@ -456,6 +470,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "update_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.updateDeal(input);
         return successResult(describeDeal(response), structuredDeal(response));
@@ -474,6 +489,7 @@ const response = await client.addNote(input);
       inputSchema: {}
     },
     async () => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_users", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.listUsers();
         return successResult(describeUsers(response), structuredUsers(response));
@@ -496,6 +512,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_calls", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.listCalls({
           contactId: input.contactId,
@@ -522,6 +539,7 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_emails", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.listEmails({
           contactId: input.contactId,
@@ -546,8 +564,9 @@ const response = await client.addNote(input);
       }
     },
     async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "mark_task_done", userId, ts: new Date().toISOString()}));
       try {
-const response = await client.markActionDone(input.taskId);
+        const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
       } catch (error) {
         return errorResult(error);
