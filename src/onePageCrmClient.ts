@@ -417,6 +417,10 @@ export class OnePageCrmClient {
     return this.request("POST", `/contacts/${encodeURIComponent(params.contactId)}/notes`, { body });
   }
 
+  async deleteNote(noteId: string): Promise<unknown> {
+    return this.request("DELETE", `/notes/${encodeURIComponent(noteId)}`);
+  }
+
   async editNote(params: { noteId: string; text?: string; date?: string }): Promise<unknown> {
     const body = compactObject({ text: params.text, date: params.date });
     return this.request("PUT", `/notes/${encodeURIComponent(params.noteId)}`, {

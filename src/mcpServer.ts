@@ -357,6 +357,26 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   );
 
   server.registerTool(
+    "delete_note",
+    {
+      title: "Delete Note",
+      description: "Delete a note from OnePage CRM by note ID.",
+      inputSchema: {
+        noteId: idSchema.describe("The OnePage CRM note ID.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "delete_note", userId, ts: new Date().toISOString()}));
+      try {
+        await client.deleteNote(input.noteId);
+        return successResult(`Note ${input.noteId} deleted successfully.`, { noteId: input.noteId, deleted: true });
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_deals",
     {
       title: "List Deals",
