@@ -357,6 +357,26 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   );
 
   server.registerTool(
+    "list_deal_attachments",
+    {
+      title: "List Deal Attachments",
+      description: "Debug tool: fetch attachments for a deal and return the raw API response.",
+      inputSchema: {
+        dealId: idSchema.describe("The OnePage CRM deal ID.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "list_deal_attachments", userId, ts: new Date().toISOString()}));
+      try {
+        const response = await client.listDealAttachments(input.dealId);
+        return successResult(JSON.stringify(response, null, 2), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "delete_note",
     {
       title: "Delete Note",
