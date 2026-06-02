@@ -360,15 +360,16 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     "list_deal_attachments",
     {
       title: "List Deal Attachments",
-      description: "Debug tool: fetch attachments for a deal and return the raw API response.",
+      description: "Debug tool: fetch attachments for a deal, trying two URL patterns and returning the raw API response.",
       inputSchema: {
-        dealId: idSchema.describe("The OnePage CRM deal ID.")
+        dealId: idSchema.describe("The OnePage CRM deal ID."),
+        contactId: idSchema.describe("The OnePage CRM contact ID associated with the deal (used as fallback URL).")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "list_deal_attachments", userId, ts: new Date().toISOString()}));
       try {
-        const response = await client.listDealAttachments(input.dealId);
+        const response = await client.listDealAttachments(input.dealId, input.contactId);
         return successResult(JSON.stringify(response, null, 2), response);
       } catch (error) {
         return errorResult(error);

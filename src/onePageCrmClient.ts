@@ -421,43 +421,64 @@ export class OnePageCrmClient {
     return this.request("DELETE", `/notes/${encodeURIComponent(noteId)}`);
   }
 
-  async listDealAttachments(dealId: string): Promise<unknown> {
-    const url = new URL(`${this.endpoint}/attachments`);
-    url.searchParams.set("reference_id", dealId);
-    url.searchParams.set("reference_type", "deal");
-
+  async listDealAttachments(dealId: string, contactId: string): Promise<unknown> {
     const headers = {
       Accept: "application/json",
       Authorization: this.authorizationHeader
     };
 
-    console.error(`listDealAttachments: GET ${url.toString()} headers=${JSON.stringify({ ...headers, Authorization: headers.Authorization.slice(0, 20) + "…" })}`);
+    // Attempt 1: GET /attachments?reference_id={dealId}&reference_type=deal
+    const url1 = new URL(`${this.endpoint}/attachments`);
+    url1.searchParams.set("reference_id", dealId);
+    url1.searchParams.set("reference_type", "deal");
 
-    let response: Response;
+    console.error(`listDealAttachments attempt1: GET ${url1.toString()} headers=${JSON.stringify({ ...headers, Authorization: headers.Authorization.slice(0, 20) + "…" })}`);
+
+    let response1: Response;
     try {
-      response = await fetch(url, { method: "GET", headers });
+      response1 = await fetch(url1, { method: "GET", headers });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown network error";
       throw new OnePageCrmApiError(0, `Could not reach OnePage CRM: ${message}`);
     }
 
-    const text = await response.text();
-    console.error(`listDealAttachments: status=${response.status} body=${text}`);
+    const text1 = await response1.text();
+    console.error(`listDealAttachments attempt1: status=${response1.status} body=${text1}`);
 
-    if (!response.ok) {
+    if (response1.ok) {
+      try { return JSON.parse(text1) as unknown; } catch { return text1; }
+    }
+
+    if (response1.status !== 404) {
       let crmMessage: string | undefined;
-      try {
-        const parsed = JSON.parse(text) as unknown;
-        crmMessage = extractMessage(parsed);
-      } catch { /* ignore */ }
-      throw new OnePageCrmApiError(response.status, friendlyStatusMessage(response.status), crmMessage);
+      try { crmMessage = extractMessage(JSON.parse(text1) as unknown); } catch { /* ignore */ }
+      throw new OnePageCrmApiError(response1.status, friendlyStatusMessage(response1.status), crmMessage);
     }
 
+    // Attempt 2 (404 fallback): GET /contacts/{contactId}/attachments?deal_id={dealId}
+    const url2 = new URL(`${this.endpoint}/contacts/${encodeURIComponent(contactId)}/attachments`);
+    url2.searchParams.set("deal_id", dealId);
+
+    console.error(`listDealAttachments attempt2: GET ${url2.toString()} headers=${JSON.stringify({ ...headers, Authorization: headers.Authorization.slice(0, 20) + "…" })}`);
+
+    let response2: Response;
     try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      return text;
+      response2 = await fetch(url2, { method: "GET", headers });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown network error";
+      throw new OnePageCrmApiError(0, `Could not reach OnePage CRM: ${message}`);
     }
+
+    const text2 = await response2.text();
+    console.error(`listDealAttachments attempt2: status=${response2.status} body=${text2}`);
+
+    if (!response2.ok) {
+      let crmMessage: string | undefined;
+      try { crmMessage = extractMessage(JSON.parse(text2) as unknown); } catch { /* ignore */ }
+      throw new OnePageCrmApiError(response2.status, friendlyStatusMessage(response2.status), crmMessage);
+    }
+
+    try { return JSON.parse(text2) as unknown; } catch { return text2; }
   }
 
   async editNote(params: { noteId: string; text?: string; date?: string }): Promise<unknown> {
