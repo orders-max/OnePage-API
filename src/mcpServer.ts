@@ -397,6 +397,27 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   );
 
   server.registerTool(
+    "search_deals",
+    {
+      title: "Search Deals",
+      description: "Search OnePage CRM deals by deal name, contact name, or company name.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        query: z.string().trim().min(1).max(200).describe("Search term matched against deal name, contact name, and company name.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "search_deals", userId, ts: new Date().toISOString()}));
+      try {
+        const response = await client.searchDeals(input.query);
+        return successResult(describeDeals(response), structuredDeals(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_deals",
     {
       title: "List Deals",

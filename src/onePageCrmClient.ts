@@ -526,6 +526,10 @@ export class OnePageCrmClient {
     });
   }
 
+  async searchDeals(query: string): Promise<unknown> {
+    return this.request("GET", "/deals", { query: { search: query } });
+  }
+
   async listDeals(params: {
     contactId?: string;
     status?: string;
