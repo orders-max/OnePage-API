@@ -582,7 +582,11 @@ export class OnePageCrmClient {
     description?: string;
     dealFields?: DealCustomFields;
   }): Promise<unknown> {
-    const body = compactObject({
+    const dealText = params.description;
+    const builtDealFields = buildDealFields(params.dealFields);
+    const splitCalls = Boolean(dealText && builtDealFields);
+
+    const bodyFields: Record<string, unknown> = {
       contact_id: params.contactId,
       name: params.name,
       amount: params.amount,
@@ -590,10 +594,31 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status) ?? "pending",
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      text: params.description,
-      deal_fields: buildDealFields(params.dealFields)
-    });
-    return this.request("POST", "/deals", { body });
+      deal_fields: builtDealFields
+    };
+    if (!splitCalls) {
+      bodyFields.text = dealText;
+    }
+    const body = compactObject(bodyFields);
+    const result = await this.request("POST", "/deals", { body });
+
+    if (splitCalls && dealText) {
+      try {
+        const deal = unwrapData(result, "deal") as Record<string, unknown> | undefined;
+        const newDealId = stringOrUndefined(deal?.id);
+        if (newDealId) {
+          await this.request("PATCH", `/deals/${encodeURIComponent(newDealId)}`, {
+            body: { deal: { text: dealText } }
+          });
+        } else {
+          console.error("createDeal: could not extract deal ID for text update");
+        }
+      } catch (error) {
+        console.error("createDeal: second call to set deal text failed:", error instanceof Error ? error.message : error);
+      }
+    }
+
+    return result;
   }
 
   async updateDeal(params: {
@@ -607,25 +632,44 @@ export class OnePageCrmClient {
     description?: string;
     dealFields?: DealCustomFields;
   }): Promise<unknown> {
-    const body = compactObject({
+    const dealText = params.description;
+    const builtDealFields = buildDealFields(params.dealFields);
+    const splitCalls = Boolean(dealText && builtDealFields);
+
+    const bodyFields: Record<string, unknown> = {
       name: params.name,
       amount: params.amount,
       stage: params.stage,
       status: mapDealStatus(params.status),
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      text: params.description,
-      deal_fields: buildDealFields(params.dealFields)
-    });
+      deal_fields: builtDealFields
+    };
+    if (!splitCalls) {
+      bodyFields.text = dealText;
+    }
+    const body = compactObject(bodyFields);
 
     if (Object.keys(body).length === 0 && !params.dealFields) {
       throw new Error("Provide at least one deal field to update.");
     }
 
-    return this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
+    const result = await this.request("PUT", `/deals/${encodeURIComponent(params.dealId)}`, {
       query: { partial: true },
       body
     });
+
+    if (splitCalls && dealText) {
+      try {
+        await this.request("PATCH", `/deals/${encodeURIComponent(params.dealId)}`, {
+          body: { deal: { text: dealText } }
+        });
+      } catch (error) {
+        console.error("updateDeal: second call to set deal text failed:", error instanceof Error ? error.message : error);
+      }
+    }
+
+    return result;
   }
 
   async listUsers(): Promise<unknown> {

@@ -55,10 +55,10 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     {
       title: "Search Contacts",
       description:
-        "Use this to search OnePage CRM contacts by name, company, or email. Returns a short contact list with IDs for follow-up calls.",
+        "Use this to search OnePage CRM contacts by person name. The name is passed directly as the search query — do not substitute a company name. Returns a short contact list with IDs for follow-up calls.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        query: z.string().trim().min(1).max(100).describe("Name, company, or email address to search for."),
+        name: z.string().trim().min(1).max(100).describe("Full person name to search for. Passed directly as the search query — do not use a company name here."),
         email: z.string().trim().email().optional().describe("Optional exact email filter."),
         includeTeam: z.boolean().optional().describe("Include contacts owned by other users on the account."),
         page: pageSchema.describe("Page number. Starts at 1."),
@@ -69,7 +69,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "search_contacts", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.searchContacts({
-          query: input.query,
+          query: input.name,
           email: input.email,
           includeTeam: input.includeTeam,
           page: input.page ?? 1,
@@ -472,7 +472,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     "create_deal",
     {
       title: "Create Deal",
-      description: "Create a new deal in OnePage CRM linked to a contact.",
+      description: "Create a new deal in OnePage CRM linked to a contact. If both description and dealFields are provided, they are applied in two sequential API calls internally (core fields + dealFields first, then description).",
       inputSchema: {
         contactId: idSchema.describe("The contact ID to link this deal to."),
         name: z.string().trim().min(1).max(255).describe("Deal name."),
@@ -509,7 +509,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     "update_deal",
     {
       title: "Update Deal",
-      description: "Update a OnePage CRM deal. Status open maps to OnePage CRM pending deals.",
+      description: "Update a OnePage CRM deal. Status open maps to OnePage CRM pending deals. If both description and dealFields are provided, they are applied in two sequential API calls internally (core fields + dealFields first, then description).",
       inputSchema: {
         dealId: idSchema.describe("The OnePage CRM deal ID."),
         name: z.string().trim().min(1).max(255).optional().describe("Deal name."),
