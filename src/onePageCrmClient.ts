@@ -777,7 +777,9 @@ export class OnePageCrmClient {
         console.error(`uploadAttachment step2 failed: empty S3 key, fields=${JSON.stringify(fields)}`);
         throw new Error('Failed to construct S3 object key');
       }
-      const fileBuffer = Buffer.from(base64Data, 'base64');
+      // Strip data URL prefix if present (e.g. "data:application/pdf;base64,...")
+      const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+      const fileBuffer = Buffer.from(rawBase64, 'base64');
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {
         if (key === 'x-ignore-pattern') continue;
