@@ -731,50 +731,64 @@ export class OnePageCrmClient {
     filename: string,
     base64Data: string
   ): Promise<void> {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    const contentTypeMap: Record<string, string> = {
-      pdf: 'application/pdf',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    };
-    const contentType = contentTypeMap[ext ?? ''] ?? 'application/octet-stream';
+    try {
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const contentTypeMap: Record<string, string> = {
+        pdf: 'application/pdf',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+      const contentType = contentTypeMap[ext ?? ''] ?? 'application/octet-stream';
 
-    // Step 1: Get presigned S3 form
-    const formRes = await this.request('POST', '/attachments/s3_form', {
-      query: { contact_id: contactId },
-      body: { file_name: filename, content_type: contentType },
-    });
-    const formData2 = (formRes as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-    const s3Url = typeof formData2?.url === 'string' ? formData2.url : undefined;
-    const fields = formData2?.fields as Record<string, string> | undefined;
-    if (!s3Url || !fields) {
-      throw new Error('Failed to get presigned S3 upload form');
+      // Step 1: Get presigned S3 form
+      const formRes = await this.request('POST', '/attachments/s3_form', {
+        query: { contact_id: contactId },
+        body: { file_name: filename, content_type: contentType },
+      });
+      const formData2 = (formRes as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const s3Url = typeof formData2?.url === 'string' ? formData2.url : undefined;
+      const fields = formData2?.fields as Record<string, string> | undefined;
+      if (!s3Url || !fields) {
+        console.error(`uploadAttachment step1 failed: status=${(formRes as Record<string, unknown>)?.status} body=${JSON.stringify((formRes as Record<string, unknown>)?.data)}`);
+        throw new Error('Failed to get presigned S3 upload form');
+      }
+
+      // Step 2: Upload file to S3
+      const fileBuffer = Buffer.from(base64Data, 'base64');
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) {
+        form.append(key, value);
+      }
+      form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
+      const s3UploadRes = await fetch(s3Url, { method: 'POST', body: form });
+      if (!s3UploadRes.ok) {
+        const body = await s3UploadRes.text();
+        console.error(`uploadAttachment step2 S3 failed: status=${s3UploadRes.status} body=${body}`);
+        throw new Error(`S3 upload failed: ${s3UploadRes.status}`);
+      }
+
+      // Step 3: Register attachment with OnePageCRM
+      const attachmentBody: Record<string, unknown> = {
+        contact_id: contactId,
+        reference_id: resourceId,
+        reference_type: resourceType,
+        file_name: filename,
+        content_type: contentType,
+        ...fields,
+      };
+      const regRes = await this.request('POST', '/attachments', {
+        body: { attachment: attachmentBody },
+      });
+      if ((regRes as Record<string, unknown>)?.status !== 0) {
+        console.error(`uploadAttachment step3 failed: status=${(regRes as Record<string, unknown>)?.status} body=${JSON.stringify((regRes as Record<string, unknown>)?.data)}`);
+      }
+    } catch (err) {
+      console.error(`uploadAttachment error:`, err);
+      throw err;
     }
-
-    // Step 2: Upload file to S3
-    const fileBuffer = Buffer.from(base64Data, 'base64');
-    const form = new FormData();
-    for (const [key, value] of Object.entries(fields)) {
-      form.append(key, value);
-    }
-    form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
-    await fetch(s3Url, { method: 'POST', body: form });
-
-    // Step 3: Register attachment with OnePageCRM
-    const attachmentBody: Record<string, unknown> = {
-      contact_id: contactId,
-      reference_id: resourceId,
-      reference_type: resourceType,
-      file_name: filename,
-      content_type: contentType,
-      ...fields,
-    };
-    await this.request('POST', '/attachments', {
-      body: { attachment: attachmentBody },
-    });
   }
 
   private async request(
