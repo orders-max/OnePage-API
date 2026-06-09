@@ -783,6 +783,8 @@ export class OnePageCrmClient {
         if (key === 'x-ignore-pattern') continue;
         form.append(key, value);
       }
+      // The presign policy requires a "Filename" field (legacy uploader convention).
+      form.append('Filename', filename);
       form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
       const s3UploadRes = await fetch(s3Url, { method: 'POST', body: form });
       if (!s3UploadRes.ok) {
