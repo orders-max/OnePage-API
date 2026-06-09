@@ -803,9 +803,17 @@ export class OnePageCrmClient {
         content_type: contentType,
         ...registrationFields,
       };
-      const regRes = await this.request('POST', '/attachments', {
-        body: { attachment: attachmentBody },
-      });
+      let regRes: unknown;
+      try {
+        regRes = await this.request('POST', '/attachments', {
+          body: { attachment: attachmentBody },
+        });
+      } catch (err) {
+        if (err instanceof OnePageCrmApiError) {
+          throw new Error(`Attachment registration failed: status=${err.status} crm=${err.crmMessage ?? 'n/a'} sent=${JSON.stringify(attachmentBody).slice(0, 400)}`);
+        }
+        throw err;
+      }
       if ((regRes as Record<string, unknown>)?.status !== 0) {
         console.error(`uploadAttachment step3 failed: status=${(regRes as Record<string, unknown>)?.status} body=${JSON.stringify((regRes as Record<string, unknown>)?.data)}`);
         throw new Error(`Attachment registration failed: status=${(regRes as Record<string, unknown>)?.status}`);
