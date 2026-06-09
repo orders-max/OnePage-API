@@ -754,11 +754,12 @@ export class OnePageCrmClient {
         console.error(`uploadAttachment step1 failed: status=${s3FormRes.status} body=${body}`);
         throw new Error(`s3_form failed: ${s3FormRes.status}`);
       }
-      const s3FormData = await s3FormRes.json() as Record<string, unknown>;
-      const s3Url = typeof s3FormData?.url === 'string' ? s3FormData.url : undefined;
-      const fields = s3FormData?.fields as Record<string, string> | undefined;
+      const s3FormJson = await s3FormRes.json() as Record<string, unknown>;
+      const s3FormInner = s3FormJson?.data as Record<string, unknown> | undefined;
+      const s3Url = typeof s3FormInner?.url === 'string' ? s3FormInner.url : undefined;
+      const fields = s3FormInner?.fields as Record<string, string> | undefined;
       if (!s3Url || !fields) {
-        console.error(`uploadAttachment step1 failed: missing url/fields in response body=${JSON.stringify(s3FormData)}`);
+        console.error(`uploadAttachment step1 failed: missing url/fields in response body=${JSON.stringify(s3FormJson)}`);
         throw new Error('Failed to get presigned S3 upload form');
       }
 
