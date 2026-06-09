@@ -30,6 +30,29 @@ import {
 } from "./formatters.js";
 import { OnePageCrmClient } from "./onePageCrmClient.js";
 
+// ── Chunked-upload session store ─────────────────────────────────────────────
+// Lets Claude split a large base64 file across multiple tool calls.
+// Sessions are keyed by a random hex token and expire after 30 minutes.
+interface ChunkSession {
+  chunks: Buffer[];
+  filename: string;
+  contactId: string;
+  resourceType: 'note' | 'deal';
+  resourceId: string;
+  expiry: number;
+}
+const chunkSessions = new Map<string, ChunkSession>();
+function purgeExpiredSessions() {
+  const now = Date.now();
+  for (const [token, s] of chunkSessions) {
+    if (s.expiry < now) chunkSessions.delete(token);
+  }
+}
+function randomToken(): string {
+  return Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const idSchema = z.string().trim().min(1).max(100);
 const pageSchema = z.number().int().min(1).max(10000).optional();
 const perPageSchema = z.number().int().min(1).max(100).optional();
@@ -451,6 +474,91 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       }
     }
   );
+
+  // ── Chunked attachment upload tools ─────────────────────────────────────────
+  // Use these when a PDF or file is too large to pass as a single base64 string
+  // (Claude's output-token limit is ~8 k tokens ≈ 30 k chars per tool call).
+  //
+  // Workflow:
+  //   1. First chunk — call upload_file_chunk with filename + resource params +
+  //      the first ~20 k-char slice of the base64.  Receive an uploadToken.
+  //   2. Middle chunks — call upload_file_chunk with uploadToken + the next
+  //      ~20 k-char slice.  Repeat until all chunks are sent.
+  //   3. Last chunk — same as above but set isLast: true.  The server assembles
+  //      the buffer, uploads to S3, and registers the attachment.
+  //
+  // For files small enough to fit in one tool call, just use attachmentBase64
+  // directly on add_note / update_deal / create_deal / edit_note as usual.
+
+  server.registerTool(
+    "upload_file_chunk",
+    {
+      title: "Upload File Chunk",
+      description:
+        "Upload one chunk of a large file attachment. Use when the full base64 is too large for a single tool call (~30 k chars). " +
+        "First call: provide contactId, resourceType, resourceId, filename, and the first base64 chunk. " +
+        "Returns an uploadToken. " +
+        "Subsequent calls: provide uploadToken and the next base64 chunk. " +
+        "Final call: set isLast: true — the server assembles the file and uploads it.",
+      inputSchema: {
+        uploadToken: z.string().optional().describe("Token returned by a previous upload_file_chunk call. Omit on the first chunk."),
+        base64Chunk: z.string().min(1).describe("Next slice of the base64-encoded file (strip any data URL prefix before slicing)."),
+        isLast: z.boolean().describe("Set true on the final chunk. The server will upload and register the attachment."),
+        contactId: idSchema.optional().describe("Contact ID — required on the first chunk only."),
+        resourceType: z.enum(["note", "deal"]).optional().describe("'note' or 'deal' — required on the first chunk only."),
+        resourceId: idSchema.optional().describe("Note or deal ID — required on the first chunk only."),
+        filename: z.string().min(1).max(255).optional().describe("Filename with extension (e.g. invoice.pdf) — required on the first chunk only.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "upload_file_chunk", userId, ts: new Date().toISOString()}));
+      purgeExpiredSessions();
+      try {
+        let session: ChunkSession;
+        let token: string;
+
+        if (input.uploadToken) {
+          const existing = chunkSessions.get(input.uploadToken);
+          if (!existing) return errorResult(new Error("Upload session not found or expired. Start over with a new first chunk."));
+          session = existing;
+          token = input.uploadToken;
+        } else {
+          // First chunk — require metadata
+          if (!input.contactId || !input.resourceType || !input.resourceId || !input.filename) {
+            return errorResult(new Error("First chunk requires contactId, resourceType, resourceId, and filename."));
+          }
+          token = randomToken();
+          session = {
+            chunks: [],
+            filename: input.filename,
+            contactId: input.contactId,
+            resourceType: input.resourceType,
+            resourceId: input.resourceId,
+            expiry: Date.now() + 30 * 60 * 1000
+          };
+          chunkSessions.set(token, session);
+        }
+
+        const rawBase64 = input.base64Chunk.replace(/^data:[^;]+;base64,/, '');
+        session.chunks.push(Buffer.from(rawBase64, 'base64'));
+        session.expiry = Date.now() + 30 * 60 * 1000; // refresh on each chunk
+
+        if (!input.isLast) {
+          const received = session.chunks.reduce((n, b) => n + b.length, 0);
+          return successResult(`Chunk received. uploadToken: ${token}. Bytes so far: ${received}. Send next chunk.`, { uploadToken: token, bytesReceived: received, done: false });
+        }
+
+        // Final chunk — assemble and upload
+        chunkSessions.delete(token);
+        const fileBuffer = Buffer.concat(session.chunks);
+        await client.uploadBuffer(session.contactId, session.resourceType, session.resourceId, session.filename, fileBuffer);
+        return successResult(`attachment: uploaded (${fileBuffer.length} bytes)`, { done: true, bytes: fileBuffer.length });
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+  // ─────────────────────────────────────────────────────────────────────────────
 
   server.registerTool(
     "list_deal_attachments",

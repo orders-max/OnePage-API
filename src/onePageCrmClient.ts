@@ -731,6 +731,47 @@ export class OnePageCrmClient {
     filename: string,
     base64Data: string
   ): Promise<void> {
+    const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+    const fileBuffer = Buffer.from(rawBase64, 'base64');
+    await this.uploadBuffer(contactId, resourceType, resourceId, filename, fileBuffer);
+  }
+
+  async uploadAttachmentFromUrl(
+    contactId: string,
+    resourceType: 'note' | 'deal',
+    resourceId: string,
+    url: string,
+    filenameHint?: string
+  ): Promise<void> {
+    const fetchRes = await fetch(url);
+    if (!fetchRes.ok) {
+      throw new Error(`Failed to fetch attachment from URL: ${fetchRes.status}`);
+    }
+    const arrayBuf = await fetchRes.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuf);
+
+    // Derive filename from hint, Content-Disposition header, or URL path
+    let filename = filenameHint;
+    if (!filename) {
+      const cd = fetchRes.headers.get('content-disposition') ?? '';
+      const cdMatch = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)/i);
+      filename = cdMatch ? decodeURIComponent(cdMatch[1].trim()) : undefined;
+    }
+    if (!filename) {
+      const urlPath = new URL(url).pathname;
+      filename = urlPath.split('/').pop() || 'attachment';
+    }
+
+    await this.uploadBuffer(contactId, resourceType, resourceId, filename, fileBuffer);
+  }
+
+  async uploadBuffer(
+    contactId: string,
+    resourceType: 'note' | 'deal',
+    resourceId: string,
+    filename: string,
+    fileBuffer: Buffer
+  ): Promise<void> {
     try {
       const ext = filename.split('.').pop()?.toLowerCase();
       const contentTypeMap: Record<string, string> = {
@@ -765,8 +806,7 @@ export class OnePageCrmClient {
 
       // Step 2: Upload file to S3
       // The presign response returns an empty `key` plus an `x-ignore-pattern`
-      // template (e.g. "abc123/__timestamp__/${filename}") that we must expand
-      // into the actual S3 key ourselves.
+      // template (e.g. "abc123/__timestamp__/${filename}") that we must expand.
       const keyPattern = fields['x-ignore-pattern'];
       if (keyPattern) {
         fields.key = keyPattern
@@ -777,9 +817,6 @@ export class OnePageCrmClient {
         console.error(`uploadAttachment step2 failed: empty S3 key, fields=${JSON.stringify(fields)}`);
         throw new Error('Failed to construct S3 object key');
       }
-      // Strip data URL prefix if present (e.g. "data:application/pdf;base64,...")
-      const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
-      const fileBuffer = Buffer.from(rawBase64, 'base64');
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {
         if (key === 'x-ignore-pattern') continue;
@@ -797,7 +834,6 @@ export class OnePageCrmClient {
 
       // Step 3: Register attachment with OnePageCRM
       // Per https://developer.onepagecrm.com/blog/upload-files-via-onepagecrm-api/
-      // the body is flat: reference_id, reference_type, contact_id, name, key, size.
       const attachmentBody: Record<string, unknown> = {
         reference_id: resourceId,
         reference_type: resourceType,
