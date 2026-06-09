@@ -724,6 +724,59 @@ export class OnePageCrmClient {
     return { text: truncated, totalChars: fullText.length };
   }
 
+  async uploadAttachment(
+    contactId: string,
+    resourceType: 'note' | 'deal',
+    resourceId: string,
+    filename: string,
+    base64Data: string
+  ): Promise<void> {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const contentTypeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    const contentType = contentTypeMap[ext ?? ''] ?? 'application/octet-stream';
+
+    // Step 1: Get presigned S3 form
+    const formRes = await this.request('POST', '/attachments/s3_form', {
+      query: { contact_id: contactId },
+      body: { file_name: filename, content_type: contentType },
+    });
+    const formData2 = (formRes as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const s3Url = typeof formData2?.url === 'string' ? formData2.url : undefined;
+    const fields = formData2?.fields as Record<string, string> | undefined;
+    if (!s3Url || !fields) {
+      throw new Error('Failed to get presigned S3 upload form');
+    }
+
+    // Step 2: Upload file to S3
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+      form.append(key, value);
+    }
+    form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
+    await fetch(s3Url, { method: 'POST', body: form });
+
+    // Step 3: Register attachment with OnePageCRM
+    const attachmentBody: Record<string, unknown> = {
+      contact_id: contactId,
+      reference_id: resourceId,
+      reference_type: resourceType,
+      file_name: filename,
+      content_type: contentType,
+      ...fields,
+    };
+    await this.request('POST', '/attachments', {
+      body: { attachment: attachmentBody },
+    });
+  }
+
   private async request(
     method: string,
     path: string,

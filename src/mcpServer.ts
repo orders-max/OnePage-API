@@ -375,14 +375,32 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         text: z.string().trim().min(1).max(7168).describe("Note text. Maximum 7168 characters."),
         date: dateSchema.optional().describe("Optional note date in YYYY-MM-DD format."),
         linkedDealId: idSchema.optional().describe("Optional deal ID to link the note to."),
-        userIdsToNotify: z.array(idSchema).max(20).optional().describe("Optional OnePage CRM user IDs to notify.")
+        userIdsToNotify: z.array(idSchema).max(20).optional().describe("Optional OnePage CRM user IDs to notify."),
+        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
+        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. report.pdf).")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "add_note", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.addNote(input);
-        return successResult(describeNote(response), structuredCreatedNote(response));
+        let text = describeNote(response);
+        if (input.attachmentBase64 && input.attachmentFilename) {
+          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+          const rawNote = rawData?.note as Record<string, unknown> | undefined;
+          const noteId = typeof rawNote?.id === 'string' ? rawNote.id : undefined;
+          if (noteId) {
+            try {
+              await client.uploadAttachment(input.contactId, 'note', noteId, input.attachmentFilename, input.attachmentBase64);
+              text += ' | attachment: uploaded';
+            } catch {
+              text += ' | attachment: failed';
+            }
+          } else {
+            text += ' | attachment: failed';
+          }
+        }
+        return successResult(text, structuredCreatedNote(response));
       } catch (error) {
         return errorResult(error);
       }
@@ -397,7 +415,10 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       inputSchema: {
         noteId: idSchema.describe("The OnePage CRM note ID."),
         text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
-        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format.")
+        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format."),
+        contactId: idSchema.optional().describe("Contact ID — required only when uploading an attachment."),
+        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
+        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. report.pdf).")
       }
     },
     async (input) => {
@@ -407,7 +428,20 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           throw new Error("Provide at least one of text or date to update.");
         }
         const response = await client.editNote(input);
-        return successResult(JSON.stringify(response), response);
+        let text = JSON.stringify(response);
+        if (input.attachmentBase64 && input.attachmentFilename) {
+          if (!input.contactId) {
+            text += ' | attachment: skipped (contactId required)';
+          } else {
+            try {
+              await client.uploadAttachment(input.contactId, 'note', input.noteId, input.attachmentFilename, input.attachmentBase64);
+              text += ' | attachment: uploaded';
+            } catch {
+              text += ' | attachment: failed';
+            }
+          }
+        }
+        return successResult(text, response);
       } catch (error) {
         return errorResult(error);
       }
@@ -577,14 +611,32 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
-        }).optional().describe("Custom deal fields.")
+        }).optional().describe("Custom deal fields."),
+        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
+        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. estimate.pdf).")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "create_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.createDeal(input);
-        return successResult(describeCreatedDeal(response), structuredCreatedDeal(response));
+        let text = describeCreatedDeal(response);
+        if (input.attachmentBase64 && input.attachmentFilename) {
+          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+          const rawDeal = rawData?.deal as Record<string, unknown> | undefined;
+          const dealId = typeof rawDeal?.id === 'string' ? rawDeal.id : undefined;
+          if (dealId) {
+            try {
+              await client.uploadAttachment(input.contactId, 'deal', dealId, input.attachmentFilename, input.attachmentBase64);
+              text += ' | attachment: uploaded';
+            } catch {
+              text += ' | attachment: failed';
+            }
+          } else {
+            text += ' | attachment: failed';
+          }
+        }
+        return successResult(text, structuredCreatedDeal(response));
       } catch (error) {
         return errorResult(error);
       }
@@ -614,14 +666,32 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
-        }).optional().describe("Custom deal fields.")
+        }).optional().describe("Custom deal fields."),
+        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
+        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. estimate.pdf).")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "update_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.updateDeal(input);
-        return successResult(describeDeal(response), structuredDeal(response));
+        let text = describeDeal(response);
+        if (input.attachmentBase64 && input.attachmentFilename) {
+          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+          const rawDeal = rawData?.deal as Record<string, unknown> | undefined;
+          const dealContactId = typeof rawDeal?.contact_id === 'string' ? rawDeal.contact_id : undefined;
+          if (dealContactId) {
+            try {
+              await client.uploadAttachment(dealContactId, 'deal', input.dealId, input.attachmentFilename, input.attachmentBase64);
+              text += ' | attachment: uploaded';
+            } catch {
+              text += ' | attachment: failed';
+            }
+          } else {
+            text += ' | attachment: failed';
+          }
+        }
+        return successResult(text, structuredDeal(response));
       } catch (error) {
         return errorResult(error);
       }
