@@ -744,15 +744,21 @@ export class OnePageCrmClient {
       const contentType = contentTypeMap[ext ?? ''] ?? 'application/octet-stream';
 
       // Step 1: Get presigned S3 form
-      const formRes = await this.request('POST', '/attachments/s3_form', {
-        query: { contact_id: contactId },
-        body: { file_name: filename, content_type: contentType },
+      const s3FormUrl = `${this.endpoint}/attachments/s3_form?contact_id=${encodeURIComponent(contactId)}&file_name=${encodeURIComponent(filename)}&content_type=${encodeURIComponent(contentType)}`;
+      const s3FormRes = await fetch(s3FormUrl, {
+        method: 'GET',
+        headers: { Authorization: this.authorizationHeader },
       });
-      const formData2 = (formRes as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-      const s3Url = typeof formData2?.url === 'string' ? formData2.url : undefined;
-      const fields = formData2?.fields as Record<string, string> | undefined;
+      if (!s3FormRes.ok) {
+        const body = await s3FormRes.text();
+        console.error(`uploadAttachment step1 failed: status=${s3FormRes.status} body=${body}`);
+        throw new Error(`s3_form failed: ${s3FormRes.status}`);
+      }
+      const s3FormData = await s3FormRes.json() as Record<string, unknown>;
+      const s3Url = typeof s3FormData?.url === 'string' ? s3FormData.url : undefined;
+      const fields = s3FormData?.fields as Record<string, string> | undefined;
       if (!s3Url || !fields) {
-        console.error(`uploadAttachment step1 failed: status=${(formRes as Record<string, unknown>)?.status} body=${JSON.stringify((formRes as Record<string, unknown>)?.data)}`);
+        console.error(`uploadAttachment step1 failed: missing url/fields in response body=${JSON.stringify(s3FormData)}`);
         throw new Error('Failed to get presigned S3 upload form');
       }
 
