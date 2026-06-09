@@ -461,7 +461,21 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "get_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.getDeal(input.dealId);
-        return successResult(describeDeal(response), structuredDeal(response));
+        let text = describeDeal(response);
+        const rawDeal = (response as { data?: { deal?: { attachments?: unknown[] } } })?.data?.deal;
+        const attachments = Array.isArray(rawDeal?.attachments) ? rawDeal.attachments : [];
+        if (attachments.length > 0) {
+          const lines = attachments.map((att) => {
+            const a = att as Record<string, unknown>;
+            const parts: string[] = [];
+            if (typeof a.filename === "string" && a.filename) parts.push(a.filename);
+            if (typeof a.url === "string" && a.url) parts.push(`url: ${a.url}`);
+            if (typeof a.url_expires_at === "string" && a.url_expires_at) parts.push(`expires: ${a.url_expires_at}`);
+            return `- ${parts.join(" | ")}`;
+          });
+          text += "\nAttachments:\n" + lines.join("\n");
+        }
+        return successResult(text, structuredDeal(response));
       } catch (error) {
         return errorResult(error);
       }
