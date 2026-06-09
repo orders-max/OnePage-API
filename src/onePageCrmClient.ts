@@ -764,9 +764,23 @@ export class OnePageCrmClient {
       }
 
       // Step 2: Upload file to S3
+      // The presign response returns an empty `key` plus an `x-ignore-pattern`
+      // template (e.g. "abc123/__timestamp__/${filename}") that we must expand
+      // into the actual S3 key ourselves.
+      const keyPattern = fields['x-ignore-pattern'];
+      if (keyPattern) {
+        fields.key = keyPattern
+          .replace('__timestamp__', Math.floor(Date.now() / 1000).toString())
+          .replace('${filename}', filename);
+      }
+      if (!fields.key) {
+        console.error(`uploadAttachment step2 failed: empty S3 key, fields=${JSON.stringify(fields)}`);
+        throw new Error('Failed to construct S3 object key');
+      }
       const fileBuffer = Buffer.from(base64Data, 'base64');
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {
+        if (key === 'x-ignore-pattern') continue;
         form.append(key, value);
       }
       form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
@@ -778,13 +792,14 @@ export class OnePageCrmClient {
       }
 
       // Step 3: Register attachment with OnePageCRM
+      const { 'x-ignore-pattern': _ignored, ...registrationFields } = fields;
       const attachmentBody: Record<string, unknown> = {
         contact_id: contactId,
         reference_id: resourceId,
         reference_type: resourceType,
         file_name: filename,
         content_type: contentType,
-        ...fields,
+        ...registrationFields,
       };
       const regRes = await this.request('POST', '/attachments', {
         body: { attachment: attachmentBody },
