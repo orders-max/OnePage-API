@@ -788,7 +788,7 @@ export class OnePageCrmClient {
       if (!s3UploadRes.ok) {
         const body = await s3UploadRes.text();
         console.error(`uploadAttachment step2 S3 failed: status=${s3UploadRes.status} body=${body}`);
-        throw new Error(`S3 upload failed: ${s3UploadRes.status}`);
+        throw new Error(`S3 upload failed: ${s3UploadRes.status} key=${fields.key} body=${body.replace(/\s+/g, ' ').slice(0, 600)}`);
       }
 
       // Step 3: Register attachment with OnePageCRM
