@@ -300,7 +300,65 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           page: input.page ?? 1,
           perPage: input.perPage ?? 20
         });
-        return successResult(describeNotes(response), structuredNotes(response));
+
+        // Extract raw note objects so we can access their attachments
+        const rawNotes = (response as Record<string, unknown>)?.data;
+        const rawItems = Array.isArray((rawNotes as Record<string, unknown>)?.notes)
+          ? ((rawNotes as Record<string, unknown>).notes as unknown[])
+          : [];
+
+        if (rawItems.length === 0) {
+          return successResult("No notes were found.", structuredNotes(response));
+        }
+
+        const lines: string[] = [];
+        for (let i = 0; i < rawItems.length; i++) {
+          const item = rawItems[i] as Record<string, unknown>;
+          const note = (typeof item.note === "object" && item.note !== null && !Array.isArray(item.note))
+            ? item.note as Record<string, unknown>
+            : item;
+
+          // Replicate formatNoteLine output
+          const noteText = typeof note.text === "string" && note.text.trim() ? note.text.trim() : "Untitled note";
+          const author = (typeof note.author_name === "string" && note.author_name.trim()) ? note.author_name.trim()
+            : (typeof note.author === "string" && note.author.trim()) ? note.author.trim() : undefined;
+          const created = (typeof note.created_at === "string" && note.created_at.trim()) ? note.created_at.trim()
+            : (typeof note.date === "string" && note.date.trim()) ? note.date.trim() : undefined;
+          const noteId = typeof note.id === "string" && note.id.trim() ? note.id.trim() : undefined;
+          const noteParts = [
+            noteText,
+            author ? `author: ${author}` : undefined,
+            created ? `created: ${created}` : undefined,
+            noteId ? `ID: ${noteId}` : undefined
+          ].filter(Boolean) as string[];
+          let noteLine = `${i + 1}. ${noteParts.join(" | ")}`;
+
+          // Append PDF content for any .pdf attachments on this note
+          const attachments = Array.isArray(note.attachments) ? note.attachments as unknown[] : [];
+          for (const att of attachments) {
+            const a = att as Record<string, unknown>;
+            const filename = typeof a.filename === "string" ? a.filename : "";
+            const url = typeof a.url === "string" ? a.url : "";
+            if (!filename.toLowerCase().endsWith(".pdf") || !url) continue;
+
+            const attParts: string[] = [filename];
+            if (url) attParts.push(`url: ${url}`);
+            if (typeof a.url_expires_at === "string" && a.url_expires_at) attParts.push(`expires: ${a.url_expires_at}`);
+            let attLine = `\n   - ${attParts.join(" | ")}`;
+            try {
+              const { text: pdfText, totalChars } = await client.fetchAndParsePdf(url);
+              const pdfNote = totalChars > 4000 ? `[PDF Content — 4000 of ${totalChars} chars]` : `[PDF Content]`;
+              attLine += `\n     ${pdfNote}\n     ${pdfText}`;
+            } catch {
+              attLine += "\n     [PDF extraction failed]";
+            }
+            noteLine += attLine;
+          }
+
+          lines.push(noteLine);
+        }
+
+        return successResult(lines.join("\n"), structuredNotes(response));
       } catch (error) {
         return errorResult(error);
       }
@@ -465,14 +523,28 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         const rawDeal = (response as { data?: { deal?: { attachments?: unknown[] } } })?.data?.deal;
         const attachments = Array.isArray(rawDeal?.attachments) ? rawDeal.attachments : [];
         if (attachments.length > 0) {
-          const lines = attachments.map((att) => {
+          const lines: string[] = [];
+          for (const att of attachments) {
             const a = att as Record<string, unknown>;
+            const filename = typeof a.filename === "string" ? a.filename : "";
+            const url = typeof a.url === "string" ? a.url : "";
+            const expires = typeof a.url_expires_at === "string" ? a.url_expires_at : "";
             const parts: string[] = [];
-            if (typeof a.filename === "string" && a.filename) parts.push(a.filename);
-            if (typeof a.url === "string" && a.url) parts.push(`url: ${a.url}`);
-            if (typeof a.url_expires_at === "string" && a.url_expires_at) parts.push(`expires: ${a.url_expires_at}`);
-            return `- ${parts.join(" | ")}`;
-          });
+            if (filename) parts.push(filename);
+            if (url) parts.push(`url: ${url}`);
+            if (expires) parts.push(`expires: ${expires}`);
+            let line = `- ${parts.join(" | ")}`;
+            if (filename.toLowerCase().endsWith(".pdf") && url) {
+              try {
+                const { text: pdfText, totalChars } = await client.fetchAndParsePdf(url);
+                const note = totalChars > 4000 ? `[PDF Content — 4000 of ${totalChars} chars]` : `[PDF Content]`;
+                line += `\n  ${note}\n  ${pdfText}`;
+              } catch {
+                line += "\n  [PDF extraction failed]";
+              }
+            }
+            lines.push(line);
+          }
           text += "\nAttachments:\n" + lines.join("\n");
         }
         return successResult(text, structuredDeal(response));

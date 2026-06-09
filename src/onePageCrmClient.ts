@@ -1,3 +1,5 @@
+import { PDFParse } from 'pdf-parse';
+
 type QueryValue = string | number | boolean | undefined | null;
 type RawContact = Record<string, unknown> & {
   id?: string;
@@ -710,6 +712,16 @@ export class OnePageCrmClient {
       query: { done: true },
       body
     });
+  }
+
+  async fetchAndParsePdf(url: string): Promise<{ text: string; totalChars: number }> {
+    const response = await fetch(url);
+    const buffer = await response.arrayBuffer();
+    const parser = new PDFParse({ data: Buffer.from(buffer) });
+    const result = await parser.getText();
+    const fullText = result.text.trim();
+    const truncated = fullText.slice(0, 4000);
+    return { text: truncated, totalChars: fullText.length };
   }
 
   private async request(
