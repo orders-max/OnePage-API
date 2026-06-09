@@ -794,19 +794,20 @@ export class OnePageCrmClient {
       }
 
       // Step 3: Register attachment with OnePageCRM
-      const { 'x-ignore-pattern': _ignored, ...registrationFields } = fields;
+      // Per https://developer.onepagecrm.com/blog/upload-files-via-onepagecrm-api/
+      // the body is flat: reference_id, reference_type, contact_id, name, key, size.
       const attachmentBody: Record<string, unknown> = {
-        contact_id: contactId,
         reference_id: resourceId,
         reference_type: resourceType,
-        file_name: filename,
-        content_type: contentType,
-        ...registrationFields,
+        contact_id: contactId,
+        name: filename,
+        key: fields.key,
+        size: fileBuffer.length,
       };
       let regRes: unknown;
       try {
         regRes = await this.request('POST', '/attachments', {
-          body: { attachment: attachmentBody },
+          body: attachmentBody,
         });
       } catch (err) {
         if (err instanceof OnePageCrmApiError) {
