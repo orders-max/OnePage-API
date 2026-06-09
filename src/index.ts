@@ -38,7 +38,12 @@ async function runHttp(): Promise<void> {
   });
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", name: "onepagecrm-mcp-server", transports: { streamableHttp: "/mcp", sse: "/sse" } });
+    res.json({
+      status: "ok",
+      name: "onepagecrm-mcp-server",
+      commit: process.env.RENDER_GIT_COMMIT ?? "unknown",
+      transports: { streamableHttp: "/mcp", sse: "/sse" },
+    });
   });
 
   app.use(["/mcp", "/sse", "/messages"], requireBearerToken);
