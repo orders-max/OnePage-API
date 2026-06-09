@@ -434,8 +434,22 @@ function noteSummary(note: RecordValue): Record<string, unknown> {
     author_id: stringOrUndefined(note.author_id) ?? stringOrUndefined(note.user_id),
     author_name: stringOrUndefined(note.author_name) ?? stringOrUndefined(note.author),
     contact_id: stringOrUndefined(note.contact_id),
-    contact_name: stringOrUndefined(note.contact_name)
+    contact_name: stringOrUndefined(note.contact_name),
+    attachments: attachmentSummaries(note.attachments)
   };
+}
+
+function attachmentSummaries(value: unknown): Array<Record<string, unknown>> | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  return value.map((entry) => {
+    const att = asRecord(entry) ?? {};
+    return {
+      id: stringOrUndefined(att.id),
+      file_name: stringOrUndefined(att.file_name) ?? stringOrUndefined(att.filename),
+      content_type: stringOrUndefined(att.content_type),
+      url: stringOrUndefined(att.url) ?? stringOrUndefined(att.download_url)
+    };
+  });
 }
 
 function dealSummary(deal: RecordValue): Record<string, unknown> {

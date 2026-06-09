@@ -385,6 +385,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       try {
         const response = await client.addNote(input);
         let text = describeNote(response);
+        let attachmentStatus: string | undefined;
         if (input.attachmentBase64 && input.attachmentFilename) {
           const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
           const rawNote = rawData?.note as Record<string, unknown> | undefined;
@@ -392,15 +393,18 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           if (noteId) {
             try {
               await client.uploadAttachment(input.contactId, 'note', noteId, input.attachmentFilename, input.attachmentBase64);
-              text += ' | attachment: uploaded';
-            } catch {
-              text += ' | attachment: failed';
+              attachmentStatus = 'uploaded';
+            } catch (err) {
+              attachmentStatus = `failed: ${err instanceof Error ? err.message : 'unknown error'}`;
             }
           } else {
-            text += ' | attachment: failed';
+            attachmentStatus = 'failed: could not determine note id';
           }
+          text += ` | attachment: ${attachmentStatus}`;
         }
-        return successResult(text, structuredCreatedNote(response));
+        const structured = structuredCreatedNote(response);
+        if (attachmentStatus) structured.attachment = attachmentStatus;
+        return successResult(text, structured);
       } catch (error) {
         return errorResult(error);
       }

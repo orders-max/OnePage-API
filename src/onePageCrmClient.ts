@@ -806,6 +806,7 @@ export class OnePageCrmClient {
       });
       if ((regRes as Record<string, unknown>)?.status !== 0) {
         console.error(`uploadAttachment step3 failed: status=${(regRes as Record<string, unknown>)?.status} body=${JSON.stringify((regRes as Record<string, unknown>)?.data)}`);
+        throw new Error(`Attachment registration failed: status=${(regRes as Record<string, unknown>)?.status}`);
       }
     } catch (err) {
       console.error(`uploadAttachment error:`, err);
