@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, type UserCredentials } from "./config.js";
 import { createMcpServer } from "./mcpServer.js";
+import { OnePageCrmClient } from "./onePageCrmClient.js";
 
 if (process.argv.includes("--stdio")) process.env.MCP_TRANSPORT = "stdio";
 if (process.argv.includes("--http")) process.env.MCP_TRANSPORT = "http";
@@ -31,7 +32,7 @@ async function runStdio(): Promise<void> {
 
 async function runHttp(): Promise<void> {
   const app = express();
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "10mb" }));
 
   app.get("/", (_req, res) => {
     res.type("text/plain").send("OnePage CRM MCP server is running. Use /mcp for Streamable HTTP or /sse for SSE.");
@@ -46,7 +47,34 @@ async function runHttp(): Promise<void> {
     });
   });
 
-  app.use(["/mcp", "/sse", "/messages"], requireBearerToken);
+  app.use(["/mcp", "/sse", "/messages", "/upload-attachment"], requireBearerToken);
+
+  // Direct REST upload — accepts full base64 in one request (no chunking needed).
+  // Body: { contactId, resourceType, resourceId, filename, base64 }
+  app.post("/upload-attachment", async (req, res) => {
+    const { contactId, resourceType, resourceId, filename, base64 } = req.body as Record<string, string>;
+    if (!contactId || !resourceType || !resourceId || !filename || !base64) {
+      res.status(400).json({ error: "Missing required field(s): contactId, resourceType, resourceId, filename, base64" });
+      return;
+    }
+    if (resourceType !== "note" && resourceType !== "deal") {
+      res.status(400).json({ error: "resourceType must be 'note' or 'deal'" });
+      return;
+    }
+    const creds = res.locals.userCreds as UserCredentials | undefined;
+    const client = new OnePageCrmClient({
+      endpoint: config.onePageCrmEndpoint,
+      userId: creds?.userId ?? config.onePageCrmUserId,
+      apiKey: creds?.apiKey ?? config.onePageCrmApiKey,
+    });
+    try {
+      await client.uploadAttachment(contactId, resourceType as "note" | "deal", resourceId, filename, base64);
+      res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: msg });
+    }
+  });
 
   app.post("/mcp", async (req, res) => {
     const server = createMcpServer(config, res.locals.userCreds as UserCredentials | undefined);
