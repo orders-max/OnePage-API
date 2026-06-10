@@ -820,8 +820,12 @@ export class OnePageCrmClient {
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {
         if (key === 'x-ignore-pattern') continue;
+        // Skip the placeholder empty key — we append the derived key below.
+        if (key === 'key') continue;
         form.append(key, value);
       }
+      // key must come before file per S3 policy ordering requirements.
+      form.append('key', fields.key);
       // The presign policy requires a "Filename" field (legacy uploader convention).
       form.append('Filename', filename);
       form.append('file', new Blob([fileBuffer], { type: contentType }), filename);
