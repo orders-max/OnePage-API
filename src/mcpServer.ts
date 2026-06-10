@@ -30,29 +30,6 @@ import {
 } from "./formatters.js";
 import { OnePageCrmClient } from "./onePageCrmClient.js";
 
-// ── Chunked-upload session store ─────────────────────────────────────────────
-// Lets Claude split a large base64 file across multiple tool calls.
-// Sessions are keyed by a random hex token and expire after 30 minutes.
-interface ChunkSession {
-  chunks: Buffer[];
-  filename: string;
-  contactId: string;
-  resourceType: 'note' | 'deal';
-  resourceId: string;
-  expiry: number;
-}
-const chunkSessions = new Map<string, ChunkSession>();
-function purgeExpiredSessions() {
-  const now = Date.now();
-  for (const [token, s] of chunkSessions) {
-    if (s.expiry < now) chunkSessions.delete(token);
-  }
-}
-function randomToken(): string {
-  return Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 const idSchema = z.string().trim().min(1).max(100);
 const pageSchema = z.number().int().min(1).max(10000).optional();
 const perPageSchema = z.number().int().min(1).max(100).optional();
@@ -354,29 +331,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
             created ? `created: ${created}` : undefined,
             noteId ? `ID: ${noteId}` : undefined
           ].filter(Boolean) as string[];
-          let noteLine = `${i + 1}. ${noteParts.join(" | ")}`;
-
-          // Append PDF content for any .pdf attachments on this note
-          const attachments = Array.isArray(note.attachments) ? note.attachments as unknown[] : [];
-          for (const att of attachments) {
-            const a = att as Record<string, unknown>;
-            const filename = typeof a.filename === "string" ? a.filename : "";
-            const url = typeof a.url === "string" ? a.url : "";
-            if (!filename.toLowerCase().endsWith(".pdf") || !url) continue;
-
-            const attParts: string[] = [filename];
-            if (url) attParts.push(`url: ${url}`);
-            if (typeof a.url_expires_at === "string" && a.url_expires_at) attParts.push(`expires: ${a.url_expires_at}`);
-            let attLine = `\n   - ${attParts.join(" | ")}`;
-            try {
-              const { text: pdfText, totalChars } = await client.fetchAndParsePdf(url);
-              const pdfNote = totalChars > 4000 ? `[PDF Content — 4000 of ${totalChars} chars]` : `[PDF Content]`;
-              attLine += `\n     ${pdfNote}\n     ${pdfText}`;
-            } catch {
-              attLine += "\n     [PDF extraction failed]";
-            }
-            noteLine += attLine;
-          }
+          const noteLine = `${i + 1}. ${noteParts.join(" | ")}`;
 
           lines.push(noteLine);
         }
@@ -398,35 +353,15 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         text: z.string().trim().min(1).max(7168).describe("Note text. Maximum 7168 characters."),
         date: dateSchema.optional().describe("Optional note date in YYYY-MM-DD format."),
         linkedDealId: idSchema.optional().describe("Optional deal ID to link the note to."),
-        userIdsToNotify: z.array(idSchema).max(20).optional().describe("Optional OnePage CRM user IDs to notify."),
-        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
-        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. report.pdf).")
+        userIdsToNotify: z.array(idSchema).max(20).optional().describe("Optional OnePage CRM user IDs to notify.")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "add_note", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.addNote(input);
-        let text = describeNote(response);
-        let attachmentStatus: string | undefined;
-        if (input.attachmentBase64 && input.attachmentFilename) {
-          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-          const rawNote = rawData?.note as Record<string, unknown> | undefined;
-          const noteId = typeof rawNote?.id === 'string' ? rawNote.id : undefined;
-          if (noteId) {
-            try {
-              await client.uploadAttachment(input.contactId, 'note', noteId, input.attachmentFilename, input.attachmentBase64);
-              attachmentStatus = 'uploaded';
-            } catch (err) {
-              attachmentStatus = `failed: ${err instanceof Error ? err.message : 'unknown error'}`;
-            }
-          } else {
-            attachmentStatus = 'failed: could not determine note id';
-          }
-          text += ` | attachment: ${attachmentStatus}`;
-        }
+        const text = describeNote(response);
         const structured = structuredCreatedNote(response);
-        if (attachmentStatus) structured.attachment = attachmentStatus;
         return successResult(text, structured);
       } catch (error) {
         return errorResult(error);
@@ -442,10 +377,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       inputSchema: {
         noteId: idSchema.describe("The OnePage CRM note ID."),
         text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
-        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format."),
-        contactId: idSchema.optional().describe("Contact ID — required only when uploading an attachment."),
-        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
-        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. report.pdf).")
+        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format.")
       }
     },
     async (input) => {
@@ -455,126 +387,8 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           throw new Error("Provide at least one of text or date to update.");
         }
         const response = await client.editNote(input);
-        let text = JSON.stringify(response);
-        if (input.attachmentBase64 && input.attachmentFilename) {
-          if (!input.contactId) {
-            text += ' | attachment: skipped (contactId required)';
-          } else {
-            try {
-              await client.uploadAttachment(input.contactId, 'note', input.noteId, input.attachmentFilename, input.attachmentBase64);
-              text += ' | attachment: uploaded';
-            } catch {
-              text += ' | attachment: failed';
-            }
-          }
-        }
+        const text = JSON.stringify(response);
         return successResult(text, response);
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-
-  // ── Chunked attachment upload tools ─────────────────────────────────────────
-  // Use these when a PDF or file is too large to pass as a single base64 string
-  // (Claude's output-token limit is ~8 k tokens ≈ 30 k chars per tool call).
-  //
-  // Workflow:
-  //   1. First chunk — call upload_file_chunk with filename + resource params +
-  //      the first ~20 k-char slice of the base64.  Receive an uploadToken.
-  //   2. Middle chunks — call upload_file_chunk with uploadToken + the next
-  //      ~20 k-char slice.  Repeat until all chunks are sent.
-  //   3. Last chunk — same as above but set isLast: true.  The server assembles
-  //      the buffer, uploads to S3, and registers the attachment.
-  //
-  // For files small enough to fit in one tool call, just use attachmentBase64
-  // directly on add_note / update_deal / create_deal / edit_note as usual.
-
-  server.registerTool(
-    "upload_file_chunk",
-    {
-      title: "Upload File Chunk",
-      description:
-        "Upload one chunk of a large file attachment. Use when the full base64 is too large for a single tool call (~30 k chars). " +
-        "First call: provide contactId, resourceType, resourceId, filename, and the first base64 chunk. " +
-        "Returns an uploadToken. " +
-        "Subsequent calls: provide uploadToken and the next base64 chunk. " +
-        "Final call: set isLast: true — the server assembles the file and uploads it.",
-      inputSchema: {
-        uploadToken: z.string().optional().describe("Token returned by a previous upload_file_chunk call. Omit on the first chunk."),
-        base64Chunk: z.string().min(1).describe("Next slice of the base64-encoded file (strip any data URL prefix before slicing)."),
-        isLast: z.boolean().describe("Set true on the final chunk. The server will upload and register the attachment."),
-        contactId: idSchema.optional().describe("Contact ID — required on the first chunk only."),
-        resourceType: z.enum(["note", "deal"]).optional().describe("'note' or 'deal' — required on the first chunk only."),
-        resourceId: idSchema.optional().describe("Note or deal ID — required on the first chunk only."),
-        filename: z.string().min(1).max(255).optional().describe("Filename with extension (e.g. invoice.pdf) — required on the first chunk only.")
-      }
-    },
-    async (input) => {
-      console.log('TOOL_USE ' + JSON.stringify({tool: "upload_file_chunk", userId, ts: new Date().toISOString()}));
-      purgeExpiredSessions();
-      try {
-        let session: ChunkSession;
-        let token: string;
-
-        if (input.uploadToken) {
-          const existing = chunkSessions.get(input.uploadToken);
-          if (!existing) return errorResult(new Error("Upload session not found or expired. Start over with a new first chunk."));
-          session = existing;
-          token = input.uploadToken;
-        } else {
-          // First chunk — require metadata
-          if (!input.contactId || !input.resourceType || !input.resourceId || !input.filename) {
-            return errorResult(new Error("First chunk requires contactId, resourceType, resourceId, and filename."));
-          }
-          token = randomToken();
-          session = {
-            chunks: [],
-            filename: input.filename,
-            contactId: input.contactId,
-            resourceType: input.resourceType,
-            resourceId: input.resourceId,
-            expiry: Date.now() + 30 * 60 * 1000
-          };
-          chunkSessions.set(token, session);
-        }
-
-        const rawBase64 = input.base64Chunk.replace(/^data:[^;]+;base64,/, '');
-        session.chunks.push(Buffer.from(rawBase64, 'base64'));
-        session.expiry = Date.now() + 30 * 60 * 1000; // refresh on each chunk
-
-        if (!input.isLast) {
-          const received = session.chunks.reduce((n, b) => n + b.length, 0);
-          return successResult(`Chunk received. uploadToken: ${token}. Bytes so far: ${received}. Send next chunk.`, { uploadToken: token, bytesReceived: received, done: false });
-        }
-
-        // Final chunk — assemble and upload
-        chunkSessions.delete(token);
-        const fileBuffer = Buffer.concat(session.chunks);
-        await client.uploadBuffer(session.contactId, session.resourceType, session.resourceId, session.filename, fileBuffer);
-        return successResult(`attachment: uploaded (${fileBuffer.length} bytes)`, { done: true, bytes: fileBuffer.length });
-      } catch (error) {
-        return errorResult(error);
-      }
-    }
-  );
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  server.registerTool(
-    "list_deal_attachments",
-    {
-      title: "List Deal Attachments",
-      description: "Debug tool: fetch attachments for a deal, trying two URL patterns and returning the raw API response.",
-      inputSchema: {
-        dealId: idSchema.describe("The OnePage CRM deal ID."),
-        contactId: idSchema.describe("The OnePage CRM contact ID associated with the deal (used as fallback URL).")
-      }
-    },
-    async (input) => {
-      console.log('TOOL_USE ' + JSON.stringify({tool: "list_deal_attachments", userId, ts: new Date().toISOString()}));
-      try {
-        const response = await client.listDealAttachments(input.dealId, input.contactId);
-        return successResult(JSON.stringify(response, null, 2), response);
       } catch (error) {
         return errorResult(error);
       }
@@ -665,34 +479,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "get_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.getDeal(input.dealId);
-        let text = describeDeal(response);
-        const rawDeal = (response as { data?: { deal?: { attachments?: unknown[] } } })?.data?.deal;
-        const attachments = Array.isArray(rawDeal?.attachments) ? rawDeal.attachments : [];
-        if (attachments.length > 0) {
-          const lines: string[] = [];
-          for (const att of attachments) {
-            const a = att as Record<string, unknown>;
-            const filename = typeof a.filename === "string" ? a.filename : "";
-            const url = typeof a.url === "string" ? a.url : "";
-            const expires = typeof a.url_expires_at === "string" ? a.url_expires_at : "";
-            const parts: string[] = [];
-            if (filename) parts.push(filename);
-            if (url) parts.push(`url: ${url}`);
-            if (expires) parts.push(`expires: ${expires}`);
-            let line = `- ${parts.join(" | ")}`;
-            if (filename.toLowerCase().endsWith(".pdf") && url) {
-              try {
-                const { text: pdfText, totalChars } = await client.fetchAndParsePdf(url);
-                const note = totalChars > 4000 ? `[PDF Content — 4000 of ${totalChars} chars]` : `[PDF Content]`;
-                line += `\n  ${note}\n  ${pdfText}`;
-              } catch {
-                line += "\n  [PDF extraction failed]";
-              }
-            }
-            lines.push(line);
-          }
-          text += "\nAttachments:\n" + lines.join("\n");
-        }
+        const text = describeDeal(response);
         return successResult(text, structuredDeal(response));
       } catch (error) {
         return errorResult(error);
@@ -723,31 +510,14 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
-        }).optional().describe("Custom deal fields."),
-        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
-        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. estimate.pdf).")
+        }).optional().describe("Custom deal fields.")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "create_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.createDeal(input);
-        let text = describeCreatedDeal(response);
-        if (input.attachmentBase64 && input.attachmentFilename) {
-          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-          const rawDeal = rawData?.deal as Record<string, unknown> | undefined;
-          const dealId = typeof rawDeal?.id === 'string' ? rawDeal.id : undefined;
-          if (dealId) {
-            try {
-              await client.uploadAttachment(input.contactId, 'deal', dealId, input.attachmentFilename, input.attachmentBase64);
-              text += ' | attachment: uploaded';
-            } catch {
-              text += ' | attachment: failed';
-            }
-          } else {
-            text += ' | attachment: failed';
-          }
-        }
+        const text = describeCreatedDeal(response);
         return successResult(text, structuredCreatedDeal(response));
       } catch (error) {
         return errorResult(error);
@@ -778,31 +548,14 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
-        }).optional().describe("Custom deal fields."),
-        attachmentBase64: z.string().optional().describe("Base64-encoded file content to attach."),
-        attachmentFilename: z.string().optional().describe("Filename for the attachment (e.g. estimate.pdf).")
+        }).optional().describe("Custom deal fields.")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "update_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.updateDeal(input);
-        let text = describeDeal(response);
-        if (input.attachmentBase64 && input.attachmentFilename) {
-          const rawData = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-          const rawDeal = rawData?.deal as Record<string, unknown> | undefined;
-          const dealContactId = typeof rawDeal?.contact_id === 'string' ? rawDeal.contact_id : undefined;
-          if (dealContactId) {
-            try {
-              await client.uploadAttachment(dealContactId, 'deal', input.dealId, input.attachmentFilename, input.attachmentBase64);
-              text += ' | attachment: uploaded';
-            } catch {
-              text += ' | attachment: failed';
-            }
-          } else {
-            text += ' | attachment: failed';
-          }
-        }
+        const text = describeDeal(response);
         return successResult(text, structuredDeal(response));
       } catch (error) {
         return errorResult(error);
