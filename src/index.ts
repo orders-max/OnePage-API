@@ -47,12 +47,13 @@ async function runHttp(): Promise<void> {
     });
   });
 
-  app.use(["/mcp", "/sse", "/messages", "/upload-attachment"], requireBearerToken);
+  app.use(["/mcp", "/sse", "/messages"], requireBearerToken);
 
   // Direct REST upload — accepts full base64 in one request (no chunking needed).
-  // Body: { contactId, resourceType, resourceId, filename, base64 }
+  // Body: { contactId, resourceType, resourceId, filename, base64, userId?, apiKey? }
+  // Credentials: supply userId+apiKey in the body, or use a USER_MAP bearer token.
   app.post("/upload-attachment", async (req, res) => {
-    const { contactId, resourceType, resourceId, filename, base64 } = req.body as Record<string, string>;
+    const { contactId, resourceType, resourceId, filename, base64, userId: bodyUserId, apiKey: bodyApiKey } = req.body as Record<string, string>;
     if (!contactId || !resourceType || !resourceId || !filename || !base64) {
       res.status(400).json({ error: "Missing required field(s): contactId, resourceType, resourceId, filename, base64" });
       return;
@@ -61,11 +62,17 @@ async function runHttp(): Promise<void> {
       res.status(400).json({ error: "resourceType must be 'note' or 'deal'" });
       return;
     }
-    const creds = res.locals.userCreds as UserCredentials | undefined;
+    const mapCreds = res.locals.userCreds as UserCredentials | undefined;
+    const resolvedUserId = bodyUserId?.trim() || mapCreds?.userId || config.onePageCrmUserId;
+    const resolvedApiKey = bodyApiKey?.trim() || mapCreds?.apiKey || config.onePageCrmApiKey;
+    if (!resolvedUserId || !resolvedApiKey) {
+      res.status(401).json({ error: "No credentials: supply userId+apiKey in the body or a valid bearer token." });
+      return;
+    }
     const client = new OnePageCrmClient({
       endpoint: config.onePageCrmEndpoint,
-      userId: creds?.userId ?? config.onePageCrmUserId,
-      apiKey: creds?.apiKey ?? config.onePageCrmApiKey,
+      userId: resolvedUserId,
+      apiKey: resolvedApiKey,
     });
     try {
       await client.uploadAttachment(contactId, resourceType as "note" | "deal", resourceId, filename, base64);
