@@ -1,5 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+// Direct sub-path import avoids pdf-parse's ESM test-file loading issue
+// @ts-ignore
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import type { AppConfig, UserCredentials } from "./config.js";
 import {
   describeNoteSearchResults,
@@ -651,6 +654,41 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       try {
         const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "fetch_attachment",
+    {
+      title: "Fetch Attachment",
+      description: "Download a PDF attachment and extract its text content. Pass the URL from an attachment returned by get_deal or list_notes.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        url: z.string().url().describe("The attachment URL to fetch and parse.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "fetch_attachment", userId, ts: new Date().toISOString()}));
+      try {
+        const res = await fetch(input.url);
+        if (!res.ok) {
+          return errorResult(new Error(`HTTP ${res.status} fetching attachment`));
+        }
+        const contentType = res.headers.get("content-type") ?? "";
+        if (!contentType.includes("pdf") && !input.url.toLowerCase().includes(".pdf")) {
+          return errorResult(new Error(`Expected a PDF but got content-type: ${contentType}`));
+        }
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const parsed = await pdfParse(buffer);
+        const text = (parsed.text as string | undefined)?.trim();
+        if (!text) {
+          return successResult("The PDF was fetched but contained no extractable text (may be a scanned image).");
+        }
+        const output = text.length > 20000 ? text.slice(0, 20000) + "\n\n[content truncated]" : text;
+        return successResult(output);
       } catch (error) {
         return errorResult(error);
       }
