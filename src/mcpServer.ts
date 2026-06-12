@@ -1,8 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-// Direct sub-path import avoids pdf-parse's ESM test-file loading issue
-// @ts-ignore
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { PDFParse } from "pdf-parse";
 import type { AppConfig, UserCredentials } from "./config.js";
 import {
   describeNoteSearchResults,
@@ -681,9 +679,15 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         if (!contentType.includes("pdf") && !input.url.toLowerCase().includes(".pdf")) {
           return errorResult(new Error(`Expected a PDF but got content-type: ${contentType}`));
         }
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const parsed = await pdfParse(buffer);
-        const text = (parsed.text as string | undefined)?.trim();
+        const buffer = new Uint8Array(await res.arrayBuffer());
+        const parser = new PDFParse({ data: buffer });
+        let text: string | undefined;
+        try {
+          const parsed = await parser.getText();
+          text = parsed.text?.trim();
+        } finally {
+          await parser.destroy().catch(() => {});
+        }
         if (!text) {
           return successResult("The PDF was fetched but contained no extractable text (may be a scanned image).");
         }
