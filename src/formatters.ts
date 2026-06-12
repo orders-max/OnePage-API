@@ -490,6 +490,7 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     expected_close_date: stringOrUndefined(deal.expected_close_date),
     description: stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description),
     created_at: stringOrUndefined(deal.created_at),
+    attachments: attachmentSummaries(deal.attachments),
     ...(Object.keys(customFields).length > 0 ? { custom_fields: customFields } : {})
   };
 }
