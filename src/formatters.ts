@@ -150,7 +150,18 @@ export function describeDeals(response: unknown): string {
 
 export function describeDeal(response: unknown): string {
   const deal = asRecord(getData(response)?.deal);
-  return deal ? formatDealLine(deal) : "The deal was returned, but the response did not include deal details.";
+  if (!deal) return "The deal was returned, but the response did not include deal details.";
+  const lines: string[] = [formatDealLine(deal)];
+  const atts = attachmentSummaries(deal.attachments);
+  if (atts && atts.length > 0) {
+    lines.push(`attachments (${atts.length}):`);
+    for (const att of atts) {
+      const name = (att.file_name as string | undefined) ?? "untitled";
+      const url = (att.url as string | undefined) ?? "";
+      lines.push(`  - ${name}${url ? ` | url: ${url}` : ""}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 export function describeCreatedDeal(response: unknown): string {
