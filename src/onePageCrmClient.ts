@@ -479,11 +479,6 @@ export class OnePageCrmClient {
   }
 
   async listNotes(params: { contactId?: string; dealId?: string; page?: number; perPage?: number }): Promise<unknown> {
-    if (params.dealId && !params.contactId) {
-      return this.request("GET", `/deals/${encodeURIComponent(params.dealId)}/notes`, {
-        query: { page: params.page, per_page: params.perPage }
-      });
-    }
     if (params.contactId) {
       return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
         query: { page: params.page, per_page: params.perPage }
@@ -491,7 +486,11 @@ export class OnePageCrmClient {
     }
 
     return this.request("GET", "/notes", {
-      query: { page: params.page, per_page: params.perPage }
+      query: {
+        linked_deal_id: params.dealId,
+        page: params.page,
+        per_page: params.perPage
+      }
     });
   }
 
@@ -555,30 +554,27 @@ export class OnePageCrmClient {
       ? pipelinesResponse as unknown[]
       : [];
 
-    const pipelineEntry = pipelineId
-      ? pipelines.find(p => {
-          if (!isRecord(p)) return false;
-          const pip = isRecord((p as Record<string, unknown>).pipeline) ? (p as Record<string, unknown>).pipeline : p;
-          return stringOrUndefined((pip as Record<string, unknown>).id) === pipelineId;
-        })
-      : pipelines.find(p => isRecord(p)); // fall back to first pipeline for accounts with a single default pipeline
+    const findPip = (p: unknown) => {
+      if (!isRecord(p)) return undefined;
+      return isRecord((p as Record<string, unknown>).pipeline) ? (p as Record<string, unknown>).pipeline as Record<string, unknown> : p as Record<string, unknown>;
+    };
 
-    const pip = pipelineEntry
-      ? (isRecord((pipelineEntry as Record<string, unknown>).pipeline)
-          ? (pipelineEntry as Record<string, unknown>).pipeline as Record<string, unknown>
-          : pipelineEntry as Record<string, unknown>)
-      : undefined;
+    const pipelineEntry = pipelineId
+      ? pipelines.find(p => stringOrUndefined(findPip(p)?.id) === pipelineId)
+      : (pipelines.find(p => findPip(p)?.default === true) ?? pipelines.find(p => isRecord(p)));
+
+    const pip = pipelineEntry ? findPip(pipelineEntry) : undefined;
 
     const stageList: Array<{ num: number; name: string }> = [];
-    if (pip && Array.isArray(pip.pipeline_stages)) {
-      for (const s of pip.pipeline_stages as unknown[]) {
-        if (!isRecord(s)) continue;
-        const num = numberOrUndefined(s.stage);
-        const name = stringOrUndefined(s.name);
-        if (num !== undefined && name) stageList.push({ num, name });
-      }
-      stageList.sort((a, b) => a.num - b.num);
+    const stageArray = Array.isArray(pip?.pipeline_stages) ? pip.pipeline_stages
+      : Array.isArray(pip?.stages) ? pip.stages : [];
+    for (const s of stageArray as unknown[]) {
+      if (!isRecord(s)) continue;
+      const num = numberOrUndefined(s.stage);
+      const name = stringOrUndefined(s.name) ?? stringOrUndefined(s.label);
+      if (num !== undefined && name) stageList.push({ num, name });
     }
+    stageList.sort((a, b) => a.num - b.num);
 
     if (stageList.length === 0) {
       throw new Error("Could not retrieve pipeline stages for this deal.");
