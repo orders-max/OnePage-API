@@ -422,7 +422,10 @@ export class OnePageCrmClient {
   }
 
   async editNote(params: { noteId: string; text?: string; date?: string; linkedDealId?: string | null }): Promise<unknown> {
-    const body = compactObject({ text: params.text, date: params.date, linked_deal_id: params.linkedDealId });
+    const body: Record<string, unknown> = compactObject({ text: params.text, date: params.date });
+    if (params.linkedDealId !== undefined) {
+      body.linked_deal_id = params.linkedDealId; // preserve null so the API can unlink
+    }
     return this.request("PUT", `/notes/${encodeURIComponent(params.noteId)}`, {
       query: { partial: true },
       body
@@ -476,14 +479,19 @@ export class OnePageCrmClient {
   }
 
   async listNotes(params: { contactId?: string; dealId?: string; page?: number; perPage?: number }): Promise<unknown> {
-    if (params.contactId && !params.dealId) {
+    if (params.dealId && !params.contactId) {
+      return this.request("GET", `/deals/${encodeURIComponent(params.dealId)}/notes`, {
+        query: { page: params.page, per_page: params.perPage }
+      });
+    }
+    if (params.contactId) {
       return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
         query: { page: params.page, per_page: params.perPage }
       });
     }
 
     return this.request("GET", "/notes", {
-      query: { contact_id: params.contactId, deal_id: params.dealId, page: params.page, per_page: params.perPage }
+      query: { page: params.page, per_page: params.perPage }
     });
   }
 
@@ -547,11 +555,13 @@ export class OnePageCrmClient {
       ? pipelinesResponse as unknown[]
       : [];
 
-    const pipelineEntry = pipelines.find(p => {
-      if (!isRecord(p)) return false;
-      const pip = isRecord((p as Record<string, unknown>).pipeline) ? (p as Record<string, unknown>).pipeline : p;
-      return stringOrUndefined((pip as Record<string, unknown>).id) === pipelineId;
-    });
+    const pipelineEntry = pipelineId
+      ? pipelines.find(p => {
+          if (!isRecord(p)) return false;
+          const pip = isRecord((p as Record<string, unknown>).pipeline) ? (p as Record<string, unknown>).pipeline : p;
+          return stringOrUndefined((pip as Record<string, unknown>).id) === pipelineId;
+        })
+      : pipelines.find(p => isRecord(p)); // fall back to first pipeline for accounts with a single default pipeline
 
     const pip = pipelineEntry
       ? (isRecord((pipelineEntry as Record<string, unknown>).pipeline)

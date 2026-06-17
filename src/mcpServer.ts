@@ -413,7 +413,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         noteId: idSchema.describe("The OnePage CRM note ID."),
         text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
         date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format."),
-        linkedDealId: idSchema.nullable().optional().describe("Deal ID to link this note to. Pass null to unlink from any deal.")
+        linkedDealId: idSchema.nullable().optional().describe("Deal ID to link this note to. The note's contact must be the same contact as the deal. Pass null to unlink from any deal.")
       }
     },
     async (input) => {
