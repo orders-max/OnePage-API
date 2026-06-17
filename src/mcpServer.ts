@@ -145,7 +145,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         phone: z.string().trim().min(1).max(50).optional().describe("Updated primary phone number."),
         jobTitle: z.string().trim().min(1).max(100).optional().describe("Updated job title."),
         background: z.string().trim().min(1).max(7168).optional().describe("Updated background notes."),
-        ownerId: idSchema.optional().describe("OnePage CRM user ID to reassign the contact to.")
+        ownerId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to reassign the contact to.")
       }
     },
     async (input) => {
@@ -168,7 +168,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         "Use this to list open OnePage CRM tasks / next actions. In the OnePage CRM API these are called actions.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        contactId: idSchema.optional().describe("Only show tasks linked to this contact ID."),
+        contactId: idSchema.nullish().transform(v => v ?? undefined).describe("Only show tasks linked to this contact ID."),
         companyId: z.string().trim().min(1).max(100).optional().describe("Only show tasks linked to this company/organization ID."),
         assigneeId: z
           .string()
@@ -264,7 +264,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         taskId: idSchema.describe("The OnePage CRM action/task ID."),
         text: z.string().trim().min(1).max(140).optional().describe("Updated task text. Maximum 140 characters."),
         dueDate: dateSchema.optional().describe("Updated due date in YYYY-MM-DD format."),
-        assigneeId: idSchema.optional().describe("OnePage CRM user ID to reassign the task to."),
+        assigneeId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to reassign the task to."),
         status: actionStatusSchema.exclude(["done"]).optional().describe("Updated task status. Use mark_task_done to complete a task.")
       }
     },
@@ -387,7 +387,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         contactId: idSchema.describe("The contact ID to add the note to."),
         text: z.string().trim().min(1).max(7168).describe("Note text. Maximum 7168 characters."),
         date: dateSchema.optional().describe("Optional note date in YYYY-MM-DD format."),
-        linkedDealId: idSchema.optional().describe("Optional deal ID to link the note to."),
+        linkedDealId: idSchema.nullish().transform(v => v ?? undefined).describe("Optional deal ID to link the note to."),
         userIdsToNotify: z.array(idSchema).max(20).optional().describe("Optional OnePage CRM user IDs to notify.")
       }
     },
@@ -479,7 +479,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       description: "List OnePage CRM deals, optionally filtered by contact and status. Status open maps to OnePage CRM pending deals.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        contactId: idSchema.optional().describe("Only show deals linked to this contact ID."),
+        contactId: idSchema.nullish().transform(v => v ?? undefined).describe("Only show deals linked to this contact ID."),
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of deals to return. Maximum 100.")
@@ -535,7 +535,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost. Defaults to open."),
         expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
-        ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
+        ownerId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to assign the deal to."),
         description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes."),
         dealFields: z.object({
           customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
@@ -573,7 +573,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         stage: z.number().int().min(0).max(99).optional().describe("Deal stage from 0 to 99."),
         status: dealStatusSchema.optional().describe("Deal status: open, won, or lost."),
         expectedCloseDate: dateSchema.optional().describe("Expected close date in YYYY-MM-DD format."),
-        ownerId: idSchema.optional().describe("OnePage CRM user ID to assign the deal to."),
+        ownerId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to assign the deal to."),
         description: z.string().trim().min(1).max(10000).optional().describe("Deal description or notes."),
         dealFields: z.object({
           customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
