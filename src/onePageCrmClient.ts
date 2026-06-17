@@ -475,16 +475,140 @@ export class OnePageCrmClient {
     return { data: { notes: matching, total_count: matching.length } };
   }
 
-  async listNotes(params: { contactId?: string; page?: number; perPage?: number }): Promise<unknown> {
-    if (params.contactId) {
+  async listNotes(params: { contactId?: string; dealId?: string; page?: number; perPage?: number }): Promise<unknown> {
+    if (params.contactId && !params.dealId) {
       return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/notes`, {
         query: { page: params.page, per_page: params.perPage }
       });
     }
 
     return this.request("GET", "/notes", {
-      query: { page: params.page, per_page: params.perPage }
+      query: { contact_id: params.contactId, deal_id: params.dealId, page: params.page, per_page: params.perPage }
     });
+  }
+
+  async updateContact(params: {
+    contactId: string;
+    firstName?: string;
+    lastName?: string;
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    jobTitle?: string;
+    background?: string;
+    ownerId?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      first_name: params.firstName,
+      last_name: params.lastName,
+      company_name: params.companyName,
+      emails: params.email ? [{ value: params.email }] : undefined,
+      phones: params.phone ? [{ value: params.phone }] : undefined,
+      job_title: params.jobTitle,
+      background: params.background,
+      owner_id: params.ownerId
+    });
+    if (Object.keys(body).length === 0) {
+      throw new Error("Provide at least one field to update.");
+    }
+    return this.request("PUT", `/contacts/${encodeURIComponent(params.contactId)}`, {
+      query: { partial: true },
+      body
+    });
+  }
+
+  async listPipelines(): Promise<unknown> {
+    return this.request("GET", "/pipelines");
+  }
+
+  async moveDealStage(params: {
+    dealId: string;
+    direction?: "next" | "previous" | "first" | "last";
+    stageName?: string;
+  }): Promise<unknown> {
+    const [dealResponse, pipelinesResponse] = await Promise.all([
+      this.getDeal(params.dealId),
+      this.listPipelines()
+    ]);
+
+    const deal = unwrapData(dealResponse, "deal") as Record<string, unknown> | undefined;
+    if (!deal) throw new Error("Could not fetch deal.");
+
+    const currentStage = numberOrUndefined(deal.stage);
+    const pipelineId = stringOrUndefined(deal.pipeline_id);
+
+    const pipelinesData = isRecord(pipelinesResponse) && isRecord((pipelinesResponse as Record<string, unknown>).data)
+      ? (pipelinesResponse as Record<string, unknown>).data as Record<string, unknown>
+      : pipelinesResponse as Record<string, unknown>;
+
+    const pipelines: unknown[] = Array.isArray(pipelinesData.pipelines)
+      ? pipelinesData.pipelines
+      : Array.isArray(pipelinesResponse)
+      ? pipelinesResponse as unknown[]
+      : [];
+
+    const pipelineEntry = pipelines.find(p => {
+      if (!isRecord(p)) return false;
+      const pip = isRecord((p as Record<string, unknown>).pipeline) ? (p as Record<string, unknown>).pipeline : p;
+      return stringOrUndefined((pip as Record<string, unknown>).id) === pipelineId;
+    });
+
+    const pip = pipelineEntry
+      ? (isRecord((pipelineEntry as Record<string, unknown>).pipeline)
+          ? (pipelineEntry as Record<string, unknown>).pipeline as Record<string, unknown>
+          : pipelineEntry as Record<string, unknown>)
+      : undefined;
+
+    const stageList: Array<{ num: number; name: string }> = [];
+    if (pip && Array.isArray(pip.pipeline_stages)) {
+      for (const s of pip.pipeline_stages as unknown[]) {
+        if (!isRecord(s)) continue;
+        const num = numberOrUndefined(s.stage);
+        const name = stringOrUndefined(s.name);
+        if (num !== undefined && name) stageList.push({ num, name });
+      }
+      stageList.sort((a, b) => a.num - b.num);
+    }
+
+    if (stageList.length === 0) {
+      throw new Error("Could not retrieve pipeline stages for this deal.");
+    }
+
+    let targetStage: number;
+
+    if (params.stageName) {
+      const lower = params.stageName.toLowerCase();
+      const found = stageList.find(s => s.name.toLowerCase() === lower);
+      if (!found) {
+        const available = stageList.map(s => `"${s.name}"`).join(", ");
+        throw new Error(`Stage "${params.stageName}" not found. Available: ${available}`);
+      }
+      targetStage = found.num;
+    } else {
+      const currentIdx = currentStage !== undefined ? stageList.findIndex(s => s.num === currentStage) : -1;
+      switch (params.direction) {
+        case "next":
+          if (currentIdx === -1 || currentIdx >= stageList.length - 1)
+            throw new Error(`Deal is already at the last stage (${stageList[stageList.length - 1].name}).`);
+          targetStage = stageList[currentIdx + 1].num;
+          break;
+        case "previous":
+          if (currentIdx <= 0)
+            throw new Error(`Deal is already at the first stage (${stageList[0].name}).`);
+          targetStage = stageList[currentIdx - 1].num;
+          break;
+        case "first":
+          targetStage = stageList[0].num;
+          break;
+        case "last":
+          targetStage = stageList[stageList.length - 1].num;
+          break;
+        default:
+          throw new Error("Provide either direction (next/previous/first/last) or stageName.");
+      }
+    }
+
+    return this.updateDeal({ dealId: params.dealId, stage: targetStage });
   }
 
   async searchDeals(query: string): Promise<unknown> {

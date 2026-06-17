@@ -132,6 +132,35 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
   );
 
   server.registerTool(
+    "update_contact",
+    {
+      title: "Update Contact",
+      description: "Update an existing OnePage CRM contact's details. Provide contactId plus any fields to change. Email and phone replace the primary value only.",
+      inputSchema: {
+        contactId: idSchema.describe("The OnePage CRM contact ID."),
+        firstName: z.string().trim().min(1).max(100).optional().describe("Updated first name."),
+        lastName: z.string().trim().min(1).max(100).optional().describe("Updated last name."),
+        companyName: z.string().trim().min(1).max(100).optional().describe("Updated company name."),
+        email: z.string().trim().email().optional().describe("Updated primary email address."),
+        phone: z.string().trim().min(1).max(50).optional().describe("Updated primary phone number."),
+        jobTitle: z.string().trim().min(1).max(100).optional().describe("Updated job title."),
+        background: z.string().trim().min(1).max(7168).optional().describe("Updated background notes."),
+        ownerId: idSchema.optional().describe("OnePage CRM user ID to reassign the contact to.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "update_contact", userId, ts: new Date().toISOString()}));
+      try {
+        const { contactId, ...rest } = input;
+        const response = await client.updateContact({ contactId, ...rest });
+        return successResult(describeContact(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
     "list_tasks",
     {
       title: "List Tasks",
@@ -285,10 +314,11 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     "list_notes",
     {
       title: "List Notes",
-      description: "List notes for a OnePage CRM contact. Optionally omit contactId to get recent notes across all contacts.",
+      description: "List notes for a OnePage CRM contact or deal. Use dealId to get all notes linked to a specific deal. Use contactId to get all notes for a contact. Both are optional — omit both to get recent notes across all contacts.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        contactId: idSchema.optional().describe("Optional OnePage CRM contact ID. If omitted, returns notes from all contacts."),
+        contactId: idSchema.optional().describe("Optional OnePage CRM contact ID."),
+        dealId: idSchema.optional().describe("Optional OnePage CRM deal ID. Returns only notes linked to this deal."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of notes to return. Maximum 100.")
       }
@@ -298,6 +328,7 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       try {
         const response = await client.listNotes({
           contactId: input.contactId,
+          dealId: input.dealId,
           page: input.page ?? 1,
           perPage: input.perPage ?? 20
         });
@@ -326,10 +357,13 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
           const created = (typeof note.created_at === "string" && note.created_at.trim()) ? note.created_at.trim()
             : (typeof note.date === "string" && note.date.trim()) ? note.date.trim() : undefined;
           const noteId = typeof note.id === "string" && note.id.trim() ? note.id.trim() : undefined;
+          const linkedDeal = (typeof note.linked_deal_name === "string" && note.linked_deal_name.trim())
+            ? note.linked_deal_name.trim() : undefined;
           const noteParts = [
             noteText,
             author ? `author: ${author}` : undefined,
             created ? `created: ${created}` : undefined,
+            linkedDeal ? `deal: ${linkedDeal}` : undefined,
             noteId ? `ID: ${noteId}` : undefined
           ].filter(Boolean) as string[];
           const noteLine = `${i + 1}. ${noteParts.join(" | ")}`;
@@ -557,6 +591,32 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "update_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.updateDeal(input);
+        const text = describeDeal(response);
+        return successResult(text, structuredDeal(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "move_deal_stage",
+    {
+      title: "Move Deal Stage",
+      description: "Move a deal to a different pipeline stage. Provide either a direction (next/previous/first/last) or a stageName. Fetches current deal and pipeline stages automatically.",
+      inputSchema: {
+        dealId: idSchema.describe("The OnePage CRM deal ID."),
+        direction: z.enum(["next", "previous", "first", "last"]).optional().describe("Move relative to current stage: next, previous, first, or last."),
+        stageName: z.string().trim().min(1).max(100).optional().describe("Exact stage name to move to (case-insensitive). If unknown, omit and use direction instead.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "move_deal_stage", userId, ts: new Date().toISOString()}));
+      try {
+        if (!input.direction && !input.stageName) {
+          throw new Error("Provide either direction or stageName.");
+        }
+        const response = await client.moveDealStage(input);
         const text = describeDeal(response);
         return successResult(text, structuredDeal(response));
       } catch (error) {
