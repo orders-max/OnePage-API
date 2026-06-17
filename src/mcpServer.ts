@@ -317,8 +317,8 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       description: "List notes for a OnePage CRM contact or deal. Use dealId to get all notes linked to a specific deal. Use contactId to get all notes for a contact. Both are optional — omit both to get recent notes across all contacts.",
       annotations: { readOnlyHint: true },
       inputSchema: {
-        contactId: idSchema.optional().describe("Optional OnePage CRM contact ID."),
-        dealId: idSchema.optional().describe("Optional OnePage CRM deal ID. Returns only notes linked to this deal."),
+        contactId: idSchema.nullish().transform(v => v ?? undefined).describe("Optional OnePage CRM contact ID."),
+        dealId: idSchema.nullish().transform(v => v ?? undefined).describe("Optional OnePage CRM deal ID. Returns only notes linked to this deal."),
         page: pageSchema.describe("Page number. Starts at 1."),
         perPage: perPageSchema.describe("Number of notes to return. Maximum 100.")
       }
