@@ -374,18 +374,19 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
     "edit_note",
     {
       title: "Edit Note",
-      description: "Use this to edit an existing note in OnePage CRM. Provide noteId plus text and/or date to update.",
+      description: "Use this to edit an existing note in OnePage CRM. Provide noteId plus any fields to update. Pass linkedDealId to move the note to a different deal (or null to unlink it from any deal).",
       inputSchema: {
         noteId: idSchema.describe("The OnePage CRM note ID."),
         text: z.string().trim().min(1).max(7168).optional().describe("Updated note text."),
-        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format.")
+        date: dateSchema.optional().describe("Updated note date in YYYY-MM-DD format."),
+        linkedDealId: idSchema.nullable().optional().describe("Deal ID to link this note to. Pass null to unlink from any deal.")
       }
     },
     async (input) => {
       console.log('TOOL_USE ' + JSON.stringify({tool: "edit_note", userId, ts: new Date().toISOString()}));
       try {
-        if (!input.text && !input.date) {
-          throw new Error("Provide at least one of text or date to update.");
+        if (!input.text && !input.date && input.linkedDealId === undefined) {
+          throw new Error("Provide at least one of text, date, or linkedDealId to update.");
         }
         const response = await client.editNote(input);
         const text = JSON.stringify(response);

@@ -421,8 +421,8 @@ export class OnePageCrmClient {
     return this.request("DELETE", `/notes/${encodeURIComponent(noteId)}`);
   }
 
-  async editNote(params: { noteId: string; text?: string; date?: string }): Promise<unknown> {
-    const body = compactObject({ text: params.text, date: params.date });
+  async editNote(params: { noteId: string; text?: string; date?: string; linkedDealId?: string | null }): Promise<unknown> {
+    const body = compactObject({ text: params.text, date: params.date, linked_deal_id: params.linkedDealId });
     return this.request("PUT", `/notes/${encodeURIComponent(params.noteId)}`, {
       query: { partial: true },
       body
