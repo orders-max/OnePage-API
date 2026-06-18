@@ -752,6 +752,67 @@ export class OnePageCrmClient {
     });
   }
 
+  async logCall(params: {
+    contactId: string;
+    text?: string;
+    callTimeInt?: number;
+    phoneNumber?: string;
+    callResult?: string;
+    via?: string;
+    date?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      text: params.text,
+      call_time_int: params.callTimeInt,
+      phone_number: params.phoneNumber,
+      call_result: params.callResult,
+      via: params.via,
+      date: params.date
+    });
+    return this.request("POST", `/contacts/${encodeURIComponent(params.contactId)}/calls`, { body });
+  }
+
+  async createCompany(params: {
+    name: string;
+    phone?: string;
+    website?: string;
+    description?: string;
+    ownerId?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      name: params.name,
+      phones: params.phone ? [{ value: params.phone }] : undefined,
+      websites: params.website ? [{ value: params.website }] : undefined,
+      description: params.description,
+      owner_id: params.ownerId
+    });
+    return this.request("POST", "/companies", { body });
+  }
+
+  async updateCompany(params: {
+    companyId: string;
+    name?: string;
+    phone?: string;
+    website?: string;
+    description?: string;
+    ownerId?: string;
+  }): Promise<unknown> {
+    const body = compactObject({
+      name: params.name,
+      phones: params.phone ? [{ value: params.phone }] : undefined,
+      websites: params.website ? [{ value: params.website }] : undefined,
+      description: params.description,
+      owner_id: params.ownerId
+    });
+    if (Object.keys(body).length === 0) {
+      throw new Error("Provide at least one field to update.");
+    }
+    return this.request("PUT", `/companies/${encodeURIComponent(params.companyId)}`, {
+      query: { partial: true },
+      body
+    });
+  }
+
   async listEmails(params: { contactId: string; page?: number; perPage?: number }): Promise<unknown> {
     return this.request("GET", `/contacts/${encodeURIComponent(params.contactId)}/email_messages`, {
       query: { page: params.page, per_page: params.perPage }

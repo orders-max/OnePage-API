@@ -5,10 +5,13 @@ import type { AppConfig, UserCredentials } from "./config.js";
 import {
   describeNoteSearchResults,
   describeActions,
+  describeCompany,
   describeContact,
   describeContactSearch,
   describeCalls,
   describeCreatedAction,
+  describeCreatedCall,
+  describeCreatedCompany,
   describeCreatedDeal,
   describeDeal,
   describeDeals,
@@ -20,6 +23,8 @@ import {
   errorResult,
   structuredActions,
   structuredCalls,
+  structuredCompany,
+  structuredCreatedCall,
   structuredCreatedDeal,
   structuredCreatedNote,
   structuredDeal,
@@ -713,6 +718,82 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       try {
         const response = await client.markActionDone(input.taskId);
         return successResult(describeDoneAction(response), response);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "log_call",
+    {
+      title: "Log Call",
+      description: "Log a phone call for a OnePage CRM contact. Records call notes, duration, outcome, and direction.",
+      inputSchema: {
+        contactId: idSchema.describe("The OnePage CRM contact ID."),
+        text: z.string().trim().min(1).max(7168).optional().describe("Call notes or summary."),
+        date: dateSchema.optional().describe("Date of the call in YYYY-MM-DD format. Defaults to today."),
+        callTimeInt: z.number().int().min(0).optional().describe("Call duration in seconds."),
+        phoneNumber: z.string().trim().min(1).max(50).optional().describe("Phone number that was called."),
+        callResult: z.enum(["answered", "left_voicemail", "no_answer", "not_interested", "wrong_number"]).optional().describe("Outcome of the call."),
+        via: z.enum(["outbound", "inbound"]).optional().describe("Call direction: outbound (you called them) or inbound (they called you).")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "log_call", userId, ts: new Date().toISOString()}));
+      try {
+        const response = await client.logCall(input);
+        return successResult(describeCreatedCall(response), structuredCreatedCall(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_company",
+    {
+      title: "Create Company",
+      description: "Create a new company/organization in OnePage CRM.",
+      inputSchema: {
+        name: z.string().trim().min(1).max(255).describe("Company name."),
+        phone: z.string().trim().min(1).max(50).optional().describe("Primary phone number."),
+        website: z.string().trim().min(1).max(500).optional().describe("Company website URL."),
+        description: z.string().trim().min(1).max(7168).optional().describe("Background notes about the company."),
+        ownerId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to assign the company to.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "create_company", userId, ts: new Date().toISOString()}));
+      try {
+        const response = await client.createCompany(input);
+        return successResult(describeCreatedCompany(response), structuredCompany(response));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_company",
+    {
+      title: "Update Company",
+      description: "Update an existing OnePage CRM company/organization. Provide companyId plus any fields to change.",
+      inputSchema: {
+        companyId: idSchema.describe("The OnePage CRM company ID."),
+        name: z.string().trim().min(1).max(255).optional().describe("Updated company name."),
+        phone: z.string().trim().min(1).max(50).optional().describe("Updated primary phone number."),
+        website: z.string().trim().min(1).max(500).optional().describe("Updated company website URL."),
+        description: z.string().trim().min(1).max(7168).optional().describe("Updated background notes."),
+        ownerId: idSchema.nullish().transform(v => v ?? undefined).describe("OnePage CRM user ID to reassign the company to.")
+      }
+    },
+    async (input) => {
+      console.log('TOOL_USE ' + JSON.stringify({tool: "update_company", userId, ts: new Date().toISOString()}));
+      try {
+        const { companyId, ...rest } = input;
+        const response = await client.updateCompany({ companyId, ...rest });
+        return successResult(describeCompany(response), structuredCompany(response));
       } catch (error) {
         return errorResult(error);
       }

@@ -237,6 +237,36 @@ export function structuredEmails(response: unknown): Record<string, unknown> {
   );
 }
 
+export function describeCreatedCall(response: unknown): string {
+  const call = asRecord(getData(response)?.call);
+  if (!call) return "The call was logged.";
+  const text = stringOrUndefined(call.text);
+  const id = stringOrUndefined(call.id);
+  return `Logged call${text ? `: ${text}` : ""}${id ? ` (ID: ${id})` : ""}`;
+}
+
+export function structuredCreatedCall(response: unknown): Record<string, unknown> {
+  const call = asRecord(getData(response)?.call);
+  return { call: call ? callSummary(call) : undefined };
+}
+
+export function describeCompany(response: unknown): string {
+  const company = asRecord(getData(response)?.company);
+  if (!company) return "The company was returned, but the response did not include company details.";
+  return formatCompanyLine(company);
+}
+
+export function describeCreatedCompany(response: unknown): string {
+  const company = asRecord(getData(response)?.company);
+  if (!company) return "The company was created.";
+  return `Created company: ${formatCompanyLine(company)}`;
+}
+
+export function structuredCompany(response: unknown): Record<string, unknown> {
+  const company = asRecord(getData(response)?.company);
+  return { company: company ? companySummary(company) : undefined };
+}
+
 export function describeDoneAction(response: unknown): string {
   const action = asRecord(getData(response)?.action);
   if (!action) {
@@ -549,6 +579,26 @@ function emailSummary(email: RecordValue): Record<string, unknown> {
     status: stringOrUndefined(email.status),
     incoming_email: typeof email.incoming_email === "boolean" ? email.incoming_email : undefined,
     url: stringOrUndefined(email.url)
+  };
+}
+
+function formatCompanyLine(company: RecordValue): string {
+  const name = stringOrUndefined(company.name) ?? "Unnamed company";
+  const id = stringOrUndefined(company.id);
+  const phone = firstListValue(company.phones);
+  const website = firstListValue(company.websites);
+  return [name, phone, website, id ? `ID: ${id}` : undefined].filter(Boolean).join(" | ");
+}
+
+function companySummary(company: RecordValue): Record<string, unknown> {
+  return {
+    id: stringOrUndefined(company.id),
+    name: stringOrUndefined(company.name),
+    phone: firstListValue(company.phones),
+    website: firstListValue(company.websites),
+    description: stringOrUndefined(company.description),
+    owner_id: stringOrUndefined(company.owner_id),
+    created_at: stringOrUndefined(company.created_at)
   };
 }
 
