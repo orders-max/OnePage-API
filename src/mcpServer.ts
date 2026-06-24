@@ -545,10 +545,10 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         dealFields: z.object({
           customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
           mmkPo: z.string().trim().min(1).max(255).optional().describe("MMK PO #"),
-          customerTracking: z.string().trim().min(1).max(255).optional().describe("Customer Tracking #"),
+          customerTracking: z.string().trim().min(1).max(255).refine(v => !["0", "N/A", "TBD"].includes(v), { message: "Values \"0\", \"N/A\", and \"TBD\" are rejected by OnePageCRM; use lowercase equivalents like \"n/a\" or \"tbd\" instead." }).optional().describe("Customer Tracking #"),
           netTerms: z.string().trim().min(1).max(255).optional().describe("Net Terms"),
           salesPerson: z.string().trim().min(1).max(255).optional().describe("Sales Person"),
-          vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
+          vendorTracking: z.string().trim().min(1).max(255).refine(v => !["0", "N/A", "TBD"].includes(v), { message: "Values \"0\", \"N/A\", and \"TBD\" are rejected by OnePageCRM; use lowercase equivalents like \"n/a\" or \"tbd\" instead." }).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
         }).optional().describe("Custom deal fields.")
@@ -583,10 +583,10 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
         dealFields: z.object({
           customerPo: z.string().trim().min(1).max(255).optional().describe("Customer PO #"),
           mmkPo: z.string().trim().min(1).max(255).optional().describe("MMK PO #"),
-          customerTracking: z.string().trim().min(1).max(255).optional().describe("Customer Tracking #"),
+          customerTracking: z.string().trim().min(1).max(255).refine(v => !["0", "N/A", "TBD"].includes(v), { message: "Values \"0\", \"N/A\", and \"TBD\" are rejected by OnePageCRM; use lowercase equivalents like \"n/a\" or \"tbd\" instead." }).optional().describe("Customer Tracking #"),
           netTerms: z.string().trim().min(1).max(255).optional().describe("Net Terms"),
           salesPerson: z.string().trim().min(1).max(255).optional().describe("Sales Person"),
-          vendorTracking: z.string().trim().min(1).max(255).optional().describe("Vendor Tracking #"),
+          vendorTracking: z.string().trim().min(1).max(255).refine(v => !["0", "N/A", "TBD"].includes(v), { message: "Values \"0\", \"N/A\", and \"TBD\" are rejected by OnePageCRM; use lowercase equivalents like \"n/a\" or \"tbd\" instead." }).optional().describe("Vendor Tracking #"),
           estimatedCloseDate: z.string().trim().min(1).max(255).optional().describe("Estimated Close Date"),
           shippingInstructions: z.string().trim().min(1).max(500).optional().describe("Shipping Instructions")
         }).optional().describe("Custom deal fields.")
