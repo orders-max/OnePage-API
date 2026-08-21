@@ -152,6 +152,13 @@ export function describeDeal(response: unknown): string {
   const deal = asRecord(getData(response)?.deal);
   if (!deal) return "The deal was returned, but the response did not include deal details.";
   const lines: string[] = [formatDealLine(deal)];
+  const customFields = dealCustomFields(deal);
+  if (Object.keys(customFields).length > 0) {
+    lines.push("custom fields:");
+    for (const [key, value] of Object.entries(customFields)) {
+      lines.push(`  - ${key}: ${value}`);
+    }
+  }
   const atts = attachmentSummaries(deal.attachments);
   if (atts && atts.length > 0) {
     lines.push(`attachments (${atts.length}):`);
@@ -167,7 +174,15 @@ export function describeDeal(response: unknown): string {
 export function describeCreatedDeal(response: unknown): string {
   const deal = asRecord(getData(response)?.deal);
   if (!deal) return "The deal was created.";
-  return `Created deal: ${formatDealLine(deal)}`;
+  const lines: string[] = [`Created deal: ${formatDealLine(deal)}`];
+  const customFields = dealCustomFields(deal);
+  if (Object.keys(customFields).length > 0) {
+    lines.push("custom fields:");
+    for (const [key, value] of Object.entries(customFields)) {
+      lines.push(`  - ${key}: ${value}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 export function structuredCreatedDeal(response: unknown): Record<string, unknown> {
@@ -493,7 +508,7 @@ function attachmentSummaries(value: unknown): Array<Record<string, unknown>> | u
   });
 }
 
-function dealSummary(deal: RecordValue): Record<string, unknown> {
+function dealCustomFields(deal: RecordValue): Record<string, string> {
   const customFields: Record<string, string> = {};
   if (Array.isArray(deal.deal_fields)) {
     for (const field of deal.deal_fields) {
@@ -506,6 +521,11 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
       }
     }
   }
+  return customFields;
+}
+
+function dealSummary(deal: RecordValue): Record<string, unknown> {
+  const customFields = dealCustomFields(deal);
   const contactIds: string[] = [];
   if (Array.isArray(deal.contacts)) {
     for (const item of deal.contacts) {
