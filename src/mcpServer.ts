@@ -520,7 +520,6 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "get_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.getDeal(input.dealId);
-        console.log('DEBUG_RAW_DEAL ' + JSON.stringify(response));
         const text = describeDeal(response);
         return successResult(text, structuredDeal(response));
       } catch (error) {
@@ -597,7 +596,6 @@ export function createMcpServer(config: AppConfig, userCreds?: UserCredentials):
       console.log('TOOL_USE ' + JSON.stringify({tool: "update_deal", userId, ts: new Date().toISOString()}));
       try {
         const response = await client.updateDeal(input);
-        console.log('DEBUG_RAW_DEAL ' + JSON.stringify(response));
         const text = describeDeal(response);
         return successResult(text, structuredDeal(response));
       } catch (error) {

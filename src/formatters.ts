@@ -510,19 +510,17 @@ function attachmentSummaries(value: unknown): Array<Record<string, unknown>> | u
 
 function dealCustomFields(deal: RecordValue): Record<string, string> {
   const customFields: Record<string, string> = {};
-  const rawFields = Array.isArray(deal.deal_fields)
-    ? deal.deal_fields
-    : Array.isArray(deal.custom_fields)
-      ? deal.custom_fields
-      : [];
+  const rawFields = Array.isArray(deal.deal_fields) ? deal.deal_fields : [];
   for (const field of rawFields) {
     const f = asRecord(field);
-    const id = stringOrUndefined(f?.id);
     const value = stringOrUndefined(f?.value);
-    if (id && value) {
-      const name = DEAL_FIELD_NAMES[id] ?? `unmapped_field_${id}`;
-      customFields[name] = value;
-    }
+    if (!value) continue;
+    // The API nests the field definition under `deal_field`, not on the entry itself.
+    const fieldDef = asRecord(f?.deal_field);
+    const id = stringOrUndefined(fieldDef?.id) ?? stringOrUndefined(f?.id);
+    if (!id) continue;
+    const name = DEAL_FIELD_NAMES[id] ?? stringOrUndefined(fieldDef?.name) ?? `unmapped_field_${id}`;
+    customFields[name] = value;
   }
   return customFields;
 }
