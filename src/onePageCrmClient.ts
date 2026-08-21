@@ -664,7 +664,8 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status) ?? "pending",
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      deal_fields: builtDealFields
+      deal_fields: builtDealFields,
+      custom_fields: builtDealFields
     };
     if (!splitCalls) {
       bodyFields.text = dealText;
@@ -713,7 +714,8 @@ export class OnePageCrmClient {
       status: mapDealStatus(params.status),
       expected_close_date: params.expectedCloseDate,
       owner_id: params.ownerId,
-      deal_fields: builtDealFields
+      deal_fields: builtDealFields,
+      custom_fields: builtDealFields
     };
     if (!splitCalls) {
       bodyFields.text = dealText;

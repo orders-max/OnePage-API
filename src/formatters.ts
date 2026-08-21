@@ -510,15 +510,18 @@ function attachmentSummaries(value: unknown): Array<Record<string, unknown>> | u
 
 function dealCustomFields(deal: RecordValue): Record<string, string> {
   const customFields: Record<string, string> = {};
-  if (Array.isArray(deal.deal_fields)) {
-    for (const field of deal.deal_fields) {
-      const f = asRecord(field);
-      const id = stringOrUndefined(f?.id);
-      const value = stringOrUndefined(f?.value);
-      if (id && value) {
-        const name = DEAL_FIELD_NAMES[id] ?? `unmapped_field_${id}`;
-        customFields[name] = value;
-      }
+  const rawFields = Array.isArray(deal.deal_fields)
+    ? deal.deal_fields
+    : Array.isArray(deal.custom_fields)
+      ? deal.custom_fields
+      : [];
+  for (const field of rawFields) {
+    const f = asRecord(field);
+    const id = stringOrUndefined(f?.id);
+    const value = stringOrUndefined(f?.value);
+    if (id && value) {
+      const name = DEAL_FIELD_NAMES[id] ?? `unmapped_field_${id}`;
+      customFields[name] = value;
     }
   }
   return customFields;
