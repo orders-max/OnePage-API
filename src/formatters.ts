@@ -516,8 +516,8 @@ function dealCustomFields(deal: RecordValue): Record<string, string> {
       const id = stringOrUndefined(f?.id);
       const value = stringOrUndefined(f?.value);
       if (id && value) {
-        const name = DEAL_FIELD_NAMES[id];
-        if (name) customFields[name] = value;
+        const name = DEAL_FIELD_NAMES[id] ?? `unmapped_field_${id}`;
+        customFields[name] = value;
       }
     }
   }
