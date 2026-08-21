@@ -353,7 +353,7 @@ function formatDealLine(deal: RecordValue): string {
   const status = normalizeDealStatus(stringOrUndefined(deal.status));
   const stage = numberOrUndefined(deal.stage);
   const closeDate = stringOrUndefined(deal.expected_close_date) ?? stringOrUndefined(deal.close_date);
-  const description = stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description);
+  const description = stringOrUndefined(deal.text) ?? stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description);
   const contactName = stringOrUndefined(deal.contact_name);
   const contactId = stringOrUndefined(deal.contact_id);
   const contactPiece = contactName
@@ -550,7 +550,7 @@ function dealSummary(deal: RecordValue): Record<string, unknown> {
     owner_id: stringOrUndefined(deal.owner_id),
     owner_name: stringOrUndefined(deal.owner_name),
     expected_close_date: stringOrUndefined(deal.expected_close_date),
-    description: stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description),
+    description: stringOrUndefined(deal.text) ?? stringOrUndefined(deal.body) ?? stringOrUndefined(deal.description),
     created_at: stringOrUndefined(deal.created_at),
     attachments: attachmentSummaries(deal.attachments),
     ...(Object.keys(customFields).length > 0 ? { custom_fields: customFields } : {})
